@@ -21,7 +21,4 @@ services:
       - key: SCOPES
         value: read_products,write_products,write_metaobject_definitions,write_metaobjects
       - key: HOST
-        fromService:
-          name: tasslelife-cart
-          type: web
-          property: host
+        value: https://tasslelife-cart.onrender.com
