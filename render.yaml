@@ -2,7 +2,7 @@ services:
   - type: web
     name: tasslelife-cart
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
@@ -28,6 +28,6 @@ services:
 
 databases:
   - name: tasslelife-cart-db
-    plan: starter
+    plan: free
     databaseName: tasslelife_cart
     user: tasslelife
