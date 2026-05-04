@@ -22,6 +22,9 @@ const DEFAULTS = {
   tier3Enabled: false,
   tier3Threshold: 150,
   tier3Label: "10% Discount",
+  tier4Enabled: false,
+  tier4Threshold: 200,
+  tier4Label: "20% Discount",
   enableUpsell: true,
   enableGiftWrap: false,
   giftWrapVariantId: "",
@@ -36,6 +39,14 @@ const DEFAULTS = {
   notePlaceholder: "Write your personal message here...",
   enableDiscount: true,
   availableDiscounts: "",
+  tier4Enabled: false,
+  tier4Threshold: 200,
+  tier4Label: "20% Discount",
+  enableDeliveryTimeline: true,
+  timelineFulfillMin: 4,
+  timelineFulfillMax: 5,
+  timelineDeliveryMin: 10,
+  timelineDeliveryMax: 11,
 };
 
 // ─── Server ────────────────────────────────────────────────────────────────
@@ -90,8 +101,16 @@ export const action = async ({ request }) => {
     enableOrderNote:     bool("enableOrderNote"),
     noteLabel:           get("noteLabel")          || "Add a handwritten note",
     notePlaceholder:     get("notePlaceholder")    || "Write your personal message here...",
-    enableDiscount:      bool("enableDiscount"),
-    availableDiscounts:  get("availableDiscounts") || "",
+    enableDiscount:         bool("enableDiscount"),
+    availableDiscounts:     get("availableDiscounts") || "",
+    tier4Enabled:           bool("tier4Enabled"),
+    tier4Threshold:         num("tier4Threshold", 200),
+    tier4Label:             get("tier4Label")           || "20% Discount",
+    enableDeliveryTimeline: bool("enableDeliveryTimeline"),
+    timelineFulfillMin:     num("timelineFulfillMin", 4),
+    timelineFulfillMax:     num("timelineFulfillMax", 5),
+    timelineDeliveryMin:    num("timelineDeliveryMin", 10),
+    timelineDeliveryMax:    num("timelineDeliveryMax", 11),
   };
 
   const shopRes = await admin.graphql(`
@@ -300,6 +319,14 @@ export default function SettingsPage() {
           <TextField id="tier3Threshold" label="Tier 3 — threshold ($)" type="number" min="0" value={v.tier3Threshold} onChange={set("tier3Threshold", Number)} />
           <TextField id="tier3Label"     label="Tier 3 — reward label"  value={v.tier3Label}     placeholder="10% Discount" onChange={set("tier3Label")} />
         </Row>
+        <SelectField id="tier4Enabled" label="Enable tier 4" value={String(v.tier4Enabled)} onChange={set("tier4Enabled")}>
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </SelectField>
+        <Row>
+          <TextField id="tier4Threshold" label="Tier 4 — threshold ($)" type="number" min="0" value={v.tier4Threshold} onChange={set("tier4Threshold", Number)} />
+          <TextField id="tier4Label"     label="Tier 4 — reward label"  value={v.tier4Label}     placeholder="20% Discount" onChange={set("tier4Label")} />
+        </Row>
       </SectionCard>
 
       {/* ── Upsell ── */}
@@ -371,6 +398,22 @@ export default function SettingsPage() {
           helpText="Format: CODE:Label,CODE2:Label2 — shown as clickable chips above the input"
           onChange={set("availableDiscounts")}
         />
+      </SectionCard>
+
+      {/* ── Delivery Timeline ── */}
+      <SectionCard heading="Delivery Timeline">
+        <SelectField id="enableDeliveryTimeline" label="Show delivery timeline in drawer" value={String(v.enableDeliveryTimeline)} onChange={set("enableDeliveryTimeline")}>
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </SelectField>
+        <Row>
+          <TextField id="timelineFulfillMin" label="Fulfillment min days" type="number" min="0" value={v.timelineFulfillMin} onChange={set("timelineFulfillMin", Number)} />
+          <TextField id="timelineFulfillMax" label="Fulfillment max days" type="number" min="0" value={v.timelineFulfillMax} onChange={set("timelineFulfillMax", Number)} />
+        </Row>
+        <Row>
+          <TextField id="timelineDeliveryMin" label="Delivery min days" type="number" min="0" value={v.timelineDeliveryMin} onChange={set("timelineDeliveryMin", Number)} />
+          <TextField id="timelineDeliveryMax" label="Delivery max days" type="number" min="0" value={v.timelineDeliveryMax} onChange={set("timelineDeliveryMax", Number)} />
+        </Row>
       </SectionCard>
 
       {/* ── Save button ── */}

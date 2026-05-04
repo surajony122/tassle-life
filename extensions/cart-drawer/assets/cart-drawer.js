@@ -57,21 +57,16 @@ class TasslelifeCartDrawer {
   }
 
   readProgressTiers() {
-    if (!this.progressEl) {
-      console.warn('[CartDrawer] Progress bar element not found (#tasslelife-cart-drawer-progress)');
-      return [];
-    }
+    if (!this.progressEl) return [];
     const tiers = [];
     const icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12l2.5 2.5L16 9"/></svg>`;
     [1, 2, 3, 4].forEach((n) => {
       const t = this.progressEl.dataset[`tier${n}Threshold`];
       const l = this.progressEl.dataset[`tier${n}Label`];
-      console.log(`[CartDrawer] Tier ${n}: threshold=${t}, label=${l}`);
       if (t && parseFloat(t) > 0) {
         tiers.push({ threshold: parseFloat(t), label: l || `Reward ${n}`, icon: icon });
       }
     });
-    console.log('[CartDrawer] Total tiers loaded:', tiers.length, tiers);
     return tiers.sort((a, b) => a.threshold - b.threshold);
   }
 
