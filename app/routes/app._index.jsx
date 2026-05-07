@@ -230,7 +230,8 @@ export default function Index() {
   ];
 
   return (
-    <s-page heading="Cart Drawer — Dashboard">
+    <div style={{ maxWidth: 800, margin: "0 auto", padding: "16px 20px" }}>
+      <ui-title-bar title="Cart Drawer — Dashboard" />
 
       {/* ── Installation Banner ── */}
       <div style={{ background: "#f4f6f8", border: "1px solid #e1e3e5", borderRadius: 8, padding: "14px 18px", marginBottom: 16 }}>
@@ -267,6 +268,7 @@ export default function Index() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         {[
           { href: "/app/settings",  label: "Settings",       desc: "Colors, position, tiers, labels" },
+          { href: "/app/coupons",   label: "Coupons",        desc: "Manage dynamic coupons list" },
           { href: "/app/upsell",    label: "Upsell",         desc: "AI / manual / collection mode" },
           { href: "/app/delivery",  label: "Delivery Rules", desc: "Per-collection date windows" },
         ].map(l => (
@@ -280,7 +282,7 @@ export default function Index() {
         ))}
       </div>
 
-    </s-page>
+    </div>
   );
 }
 

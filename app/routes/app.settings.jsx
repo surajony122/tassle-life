@@ -266,7 +266,8 @@ export default function SettingsPage() {
   };
 
   return (
-    <s-page heading="Cart Drawer Settings">
+    <div style={{ maxWidth: 800, margin: "0 auto", padding: "16px 20px" }}>
+      <ui-title-bar title="Cart Drawer Settings" />
 
       {/* ── Appearance ── */}
       <SectionCard heading="Appearance">
@@ -381,22 +382,6 @@ export default function SettingsPage() {
         <TextField id="notePlaceholder" label="Placeholder text" value={v.notePlaceholder} placeholder="Write your personal message here..." onChange={set("notePlaceholder")} />
       </SectionCard>
 
-      {/* ── Discount ── */}
-      <SectionCard heading="Discount Code">
-        <SelectField id="enableDiscount" label="Show discount code field" value={String(v.enableDiscount)} onChange={set("enableDiscount")}>
-          <option value="true">Enabled</option>
-          <option value="false">Disabled</option>
-        </SelectField>
-        <TextField
-          id="availableDiscounts"
-          label="Available discount codes"
-          value={v.availableDiscounts}
-          placeholder="SAVE10:10% Off,FREESHIP:Free Shipping"
-          helpText="Format: CODE:Label,CODE2:Label2 — shown as clickable chips above the input"
-          onChange={set("availableDiscounts")}
-        />
-      </SectionCard>
-
       {/* ── Delivery Timeline ── */}
       <SectionCard heading="Delivery Timeline">
         <SelectField id="enableDeliveryTimeline" label="Show delivery timeline in drawer" value={String(v.enableDeliveryTimeline)} onChange={set("enableDeliveryTimeline")}>
@@ -414,17 +399,21 @@ export default function SettingsPage() {
       </SectionCard>
 
       {/* ── Save button ── */}
-      <div style={{ paddingBottom: 32 }}>
-        <s-button
-          variant="primary"
+      <div style={{ paddingBottom: 32, display: "flex", justifyContent: "flex-end" }}>
+        <button
           onClick={handleSave}
-          {...(isSaving ? { loading: true } : {})}
+          disabled={isSaving}
+          style={{
+            background: "#000", color: "#fff", border: "none", borderRadius: 4, padding: "8px 16px",
+            fontSize: 13, fontWeight: 600, cursor: isSaving ? "not-allowed" : "pointer",
+            opacity: isSaving ? 0.7 : 1
+          }}
         >
           {isSaving ? "Saving..." : "Save settings"}
-        </s-button>
+        </button>
       </div>
 
-    </s-page>
+    </div>
   );
 }
 

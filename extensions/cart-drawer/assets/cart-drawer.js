@@ -475,75 +475,215 @@ class TasslelifeCartDrawer {
     }
   }
 
-  // ─── Discount Code ────────────────────────────────────────────────────────
+  // ─── Coupons & Discount ───────────────────────────────────────────────────
 
   initDiscount() {
-    this.discountInput    = document.getElementById('tasslelife-cart-drawer-discount-input');
-    this.discountMsg      = document.getElementById('tasslelife-cart-drawer-discount-msg');
-    this.discountApplyBtn = document.getElementById('tasslelife-cart-drawer-discount-apply');
-    const chipsEl         = document.getElementById('tasslelife-cart-drawer-discount-chips');
+    this.couponsData = [];
+    try {
+      const script = document.getElementById('tasslelife-coupons-data');
+      if (script) this.couponsData = JSON.parse(script.textContent);
+    } catch (e) {}
 
-    if (!this.discountInput || !this.discountApplyBtn) return;
+    this.compactEl = document.getElementById('tasslelife-cart-drawer-coupons-compact');
+    this.modalEl = document.getElementById('tasslelife-cart-drawer-coupons-modal');
+    this.modalOverlay = document.getElementById('tasslelife-cart-drawer-coupons-overlay');
+    
+    // Bind modal events
+    const viewAllBtn = document.getElementById('tasslelife-cart-drawer-coupons-view-all');
+    if (viewAllBtn) viewAllBtn.addEventListener('click', () => this.openCouponsModal());
+    
+    const modalBack = document.querySelector('.tasslelife-cart-drawer__coupons-modal-back');
+    if (modalBack) modalBack.addEventListener('click', () => this.closeCouponsModal());
+    if (this.modalOverlay) this.modalOverlay.addEventListener('click', () => this.closeCouponsModal());
 
-    // Render clickable chips from data-available attribute
-    if (chipsEl && chipsEl.dataset.available) {
-      this.renderDiscountChips(chipsEl.dataset.available, chipsEl);
+    // Bind compact apply button
+    const compactApplyBtn = document.querySelector('.tasslelife-cart-drawer__coupons-compact-apply');
+    if (compactApplyBtn) {
+      compactApplyBtn.addEventListener('click', () => {
+        if (compactApplyBtn.dataset.state === 'applied') {
+          this.removeDiscount();
+        } else if (this.bestCoupon) {
+          this.applyDiscount(this.bestCoupon.code, `Save ${this.formatMoney(this.bestCoupon.savings)}`);
+        }
+      });
     }
 
-    // Restore saved discount
+    // Manual input bindings
+    this.discountInput = document.getElementById('tasslelife-cart-drawer-discount-input');
+    this.discountMsg = document.getElementById('tasslelife-cart-drawer-discount-msg');
+    this.discountApplyBtn = document.getElementById('tasslelife-cart-drawer-discount-apply');
+    
+    if (this.discountApplyBtn && this.discountInput) {
+      this.discountApplyBtn.addEventListener('click', () => {
+        if (this.discountApplyBtn.dataset.state === 'applied') {
+          this.removeDiscount();
+        } else {
+          const code = this.discountInput.value.trim().toUpperCase();
+          if (code) this.applyDiscount(code, `Code applied`);
+        }
+      });
+      this.discountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') this.discountApplyBtn.click();
+      });
+    }
+
     const saved = sessionStorage.getItem('tasslelife_cart_drawer_discount');
-    if (saved) this.applyDiscountState(saved);
+    if (saved) {
+      this.appliedCode = saved;
+      this.appliedLabel = sessionStorage.getItem('tasslelife_cart_drawer_discount_label');
+    }
+  }
 
-    this.discountApplyBtn.addEventListener('click', () => {
-      if (this.discountApplyBtn.dataset.state === 'applied') {
-        this.removeDiscount();
+  openCouponsModal() {
+    if (!this.modalEl) return;
+    this.modalEl.classList.add('is-open');
+    this.modalOverlay.classList.add('is-visible');
+    this.modalEl.setAttribute('aria-hidden', 'false');
+  }
+
+  closeCouponsModal() {
+    if (!this.modalEl) return;
+    this.modalEl.classList.remove('is-open');
+    this.modalOverlay.classList.remove('is-visible');
+    this.modalEl.setAttribute('aria-hidden', 'true');
+  }
+
+  renderCoupons(cart) {
+    if (!this.compactEl || !this.couponsData.length) return;
+    
+    const subtotal = cart.original_total_price / 100;
+    
+    // Sort and calculate savings
+    const evaluated = this.couponsData.map(c => {
+      let savingsCents = 0;
+      if (c.type === 'percentage') savingsCents = Math.round(cart.original_total_price * (c.value / 100));
+      else if (c.type === 'fixed') savingsCents = c.value * 100;
+      
+      const isAvailable = subtotal >= c.minThreshold;
+      const shortfall = isAvailable ? 0 : c.minThreshold - subtotal;
+      
+      return { ...c, savings: savingsCents, isAvailable, shortfall };
+    });
+    
+    // Split
+    const available = evaluated.filter(c => c.isAvailable).sort((a,b) => b.savings - a.savings);
+    const unavailable = evaluated.filter(c => !c.isAvailable).sort((a,b) => a.shortfall - b.shortfall);
+    
+    this.bestCoupon = available[0] || null;
+    
+    // Render Compact
+    this.compactEl.style.display = 'block';
+    const compactApplyBtn = document.querySelector('.tasslelife-cart-drawer__coupons-compact-apply');
+    if (this.bestCoupon) {
+      document.getElementById('tasslelife-cart-drawer-best-savings').textContent = `Save ${this.formatMoney(this.bestCoupon.savings)}`;
+      document.getElementById('tasslelife-cart-drawer-best-code').textContent = `with '${this.bestCoupon.code}'`;
+      const moreCount = available.length + unavailable.length - 1;
+      document.getElementById('tasslelife-cart-drawer-more-count').textContent = moreCount;
+      
+      const isApplied = this.appliedCode === this.bestCoupon.code;
+      compactApplyBtn.style.display = 'block';
+      compactApplyBtn.textContent = isApplied ? 'Applied' : 'Apply';
+      compactApplyBtn.dataset.state = isApplied ? 'applied' : '';
+      if (isApplied) compactApplyBtn.classList.add('is-applied');
+      else compactApplyBtn.classList.remove('is-applied');
+    } else if (unavailable.length) {
+      // Show closest unavailable
+      const closest = unavailable[0];
+      document.getElementById('tasslelife-cart-drawer-best-savings').textContent = `Save ${this.formatMoney(closest.savings || closest.value*100)}`;
+      document.getElementById('tasslelife-cart-drawer-best-code').textContent = `with '${closest.code}'`;
+      document.getElementById('tasslelife-cart-drawer-more-count').textContent = evaluated.length - 1;
+      compactApplyBtn.style.display = 'none';
+    } else {
+      this.compactEl.style.display = 'none';
+    }
+    
+    // Render Modal Lists
+    const availContainer = document.getElementById('tasslelife-cart-drawer-available-coupons');
+    const unavailContainer = document.getElementById('tasslelife-cart-drawer-unavailable-coupons');
+    
+    if (availContainer) availContainer.innerHTML = available.map(c => this.couponCardHTML(c, true)).join('');
+    if (unavailContainer) unavailContainer.innerHTML = unavailable.map(c => this.couponCardHTML(c, false)).join('');
+    
+    // Bind modal apply buttons
+    document.querySelectorAll('.tasslelife-cart-drawer__coupon-apply-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const code = e.target.dataset.code;
+        const label = e.target.dataset.label;
+        if (e.target.dataset.state === 'applied') {
+          this.removeDiscount();
+        } else {
+          this.applyDiscount(code, label);
+          this.closeCouponsModal();
+        }
+      });
+    });
+    
+    // Sync manual input state
+    if (this.discountInput && this.discountApplyBtn) {
+      if (this.appliedCode) {
+        this.discountInput.value = this.appliedCode;
+        this.discountInput.readOnly = true;
+        this.discountApplyBtn.textContent = 'Remove';
+        this.discountApplyBtn.dataset.state = 'applied';
+        if (this.discountMsg) {
+          this.discountMsg.textContent = `"${this.appliedCode}" will be applied at checkout`;
+          this.discountMsg.className = 'tasslelife-cart-drawer__discount-msg is-success';
+        }
       } else {
-        const code = this.discountInput.value.trim().toUpperCase();
-        if (code) this.applyDiscount(code);
+        this.discountInput.value = '';
+        this.discountInput.readOnly = false;
+        this.discountApplyBtn.textContent = 'Apply';
+        this.discountApplyBtn.dataset.state = '';
+        if (this.discountMsg) this.discountMsg.textContent = '';
       }
-    });
+    }
+  }
 
-    this.discountInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') this.discountApplyBtn.click();
-    });
+  couponCardHTML(c, isAvailable) {
+    const isApplied = this.appliedCode === c.code;
+    const desc = c.type === 'percentage' ? `${c.value}% off` : `${this.formatMoney(c.value * 100)} off`;
+    return `
+      <div class="tasslelife-cart-drawer__coupon-card ${isAvailable ? 'is-available' : 'is-unavailable'}">
+        <div class="tasslelife-cart-drawer__coupon-header">
+          <div class="tasslelife-cart-drawer__coupon-code">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="7" y1="7" x2="7.01" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            ${c.code}
+          </div>
+          ${isAvailable ? `
+            <button class="tasslelife-cart-drawer__coupon-apply-btn" data-code="${c.code}" data-label="Save ${this.formatMoney(c.savings)}" data-state="${isApplied ? 'applied' : ''}">
+              ${isApplied ? 'Applied' : 'Apply'}
+            </button>
+          ` : ''}
+        </div>
+        <p class="tasslelife-cart-drawer__coupon-desc">${desc}</p>
+        <p class="tasslelife-cart-drawer__coupon-cond">on orders above ${this.formatMoney(c.minThreshold * 100)}</p>
+        ${isAvailable ? `
+          <p class="tasslelife-cart-drawer__coupon-save-msg">Save ${this.formatMoney(c.savings)} on this order!</p>
+          <p class="tasslelife-cart-drawer__coupon-view-more">View more</p>
+        ` : `
+          <p class="tasslelife-cart-drawer__coupon-shortfall">Add ${this.formatMoney(c.shortfall * 100)} more to avail this offer</p>
+        `}
+      </div>
+    `;
   }
 
   applyDiscount(code, label) {
+    this.appliedCode = code;
+    this.appliedLabel = label;
     sessionStorage.setItem('tasslelife_cart_drawer_discount', code);
     if (label) sessionStorage.setItem('tasslelife_cart_drawer_discount_label', label);
-    this.applyDiscountState(code);
-  }
-
-  applyDiscountState(code) {
-    if (!this.discountInput) return;
-    this.discountInput.value    = code;
-    this.discountInput.readOnly = true;
-    this.discountApplyBtn.textContent    = 'Remove';
-    this.discountApplyBtn.dataset.state  = 'applied';
-    this.discountApplyBtn.classList.add('is-applied');
-    if (this.discountMsg) {
-      this.discountMsg.textContent = `"${code}" will be applied at checkout`;
-      this.discountMsg.className   = 'tasslelife-cart-drawer__discount-msg is-success';
-    }
     this.updateCheckoutUrl(code);
+    this.refresh();
   }
 
   removeDiscount() {
+    this.appliedCode = null;
+    this.appliedLabel = null;
     sessionStorage.removeItem('tasslelife_cart_drawer_discount');
     sessionStorage.removeItem('tasslelife_cart_drawer_discount_label');
-    if (this.discountInput) {
-      this.discountInput.value    = '';
-      this.discountInput.readOnly = false;
-    }
-    this.discountApplyBtn.textContent   = 'Apply';
-    this.discountApplyBtn.dataset.state = '';
-    this.discountApplyBtn.classList.remove('is-applied');
-    if (this.discountMsg) {
-      this.discountMsg.textContent = '';
-      this.discountMsg.className   = 'tasslelife-cart-drawer__discount-msg';
-    }
     this.updateCheckoutUrl(null);
     this.updateSavingsDisplay(0);
+    this.refresh();
   }
 
   // ─── Savings display ─────────────────────────────────────────────────────
@@ -601,58 +741,7 @@ class TasslelifeCartDrawer {
     btn.href = code ? `/checkout?discount=${encodeURIComponent(code)}` : '/checkout';
   }
 
-  renderDiscountChips(available, container) {
-    const chips = available.split(',').map(s => {
-      const [code, ...rest] = s.trim().split(':');
-      return { code: code?.trim().toUpperCase(), label: rest.join(':').trim() || code?.trim() };
-    }).filter(c => c.code);
-
-    if (!chips.length) return;
-    
-    const featured = chips[0];
-    const moreCount = chips.length - 1;
-    const savedCode = sessionStorage.getItem('tasslelife_cart_drawer_discount');
-    const isApplied = savedCode === featured.code;
-
-    container.innerHTML = `
-      <div class="tasslelife-cart-drawer__discount-card">
-        <div class="tasslelife-cart-drawer__discount-featured">
-          <div class="tasslelife-cart-drawer__discount-icon-wrap">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5L5 19M19 19L5 5"></path><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
-          </div>
-          <div class="tasslelife-cart-drawer__discount-info">
-            <p class="tasslelife-cart-drawer__discount-save">${featured.label}</p>
-            <p class="tasslelife-cart-drawer__discount-code">with '<strong>${featured.code}</strong>'</p>
-          </div>
-          <button class="tasslelife-cart-drawer__discount-quick-apply ${isApplied ? 'is-applied' : ''}" data-code="${featured.code}">${isApplied ? 'Applied' : 'Apply'}</button>
-        </div>
-        ${moreCount > 0 ? `
-        <div class="tasslelife-cart-drawer__discount-more">
-          <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M19 5L5 19M19 19L5 5"></path><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg> +${moreCount} more offers</span>
-          <button class="tasslelife-cart-drawer__discount-view-all">View all coupons ></button>
-        </div>
-        ` : ''}
-      </div>
-    `;
-
-    container.querySelector('.tasslelife-cart-drawer__discount-quick-apply').addEventListener('click', (e) => {
-      if (e.target.classList.contains('is-applied')) {
-        this.removeDiscount();
-        this.refresh();
-      } else {
-        this.applyDiscount(featured.code, featured.label);
-        this.refresh();
-      }
-    });
-
-    const viewAllBtn = container.querySelector('.tasslelife-cart-drawer__discount-view-all');
-    if (viewAllBtn) {
-      viewAllBtn.addEventListener('click', () => {
-        document.getElementById('tasslelife-cart-drawer-discount-manual').style.display = 'flex';
-        viewAllBtn.style.display = 'none';
-      });
-    }
-  }
+  // The renderDiscountChips method is no longer needed since we use Coupons Modal.
 
   // ─── Delivery Timeline ────────────────────────────────────────────────────
 
@@ -747,6 +836,7 @@ class TasslelifeCartDrawer {
     this.syncGiftWrap(cart);
     this.syncDeliveryDate(cart);
     this.syncNote(cart);
+    this.renderCoupons(cart);
     this.renderSavings(cart);
     this.toggleFooter(cart);
   }

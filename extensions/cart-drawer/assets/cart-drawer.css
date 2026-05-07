@@ -100,26 +100,57 @@ body.tasslelife-cart-drawer-open { overflow: hidden; }
 .tasslelife-cart-drawer__empty-sub { font-size: 12px; margin: 0 0 18px; }
 .tasslelife-cart-drawer__continue-btn { background: #111; color: #fff; border: none; padding: 10px 22px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
 
-/* ─── Discount ────────────────────────────────────────────────────────────── */
-.tasslelife-cart-drawer__discount-container { padding: 0 16px 12px; }
-.tasslelife-cart-drawer__discount-card { border: 1px solid #b8e0c8; border-radius: 10px; background: #fff; overflow: hidden; }
-.tasslelife-cart-drawer__discount-featured { display: flex; align-items: center; padding: 10px 12px; gap: 10px; }
-.tasslelife-cart-drawer__discount-icon-wrap { width: 28px; height: 28px; background: #eafaf1; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.tasslelife-cart-drawer__discount-info { flex: 1; min-width: 0; }
-.tasslelife-cart-drawer__discount-save { color: #166534; font-size: 13px; font-weight: 700; margin: 0; line-height: 1.2; }
-.tasslelife-cart-drawer__discount-code { font-size: 11px; color: #555; margin: 2px 0 0; }
-.tasslelife-cart-drawer__discount-quick-apply { background: #f0fdf4; color: #166534; border: 1px solid #b8e0c8; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
-.tasslelife-cart-drawer__discount-quick-apply:hover { background: #dcfce7; }
-.tasslelife-cart-drawer__discount-quick-apply.is-applied { background: #f5f5f5; color: #888; border-color: #ddd; }
-.tasslelife-cart-drawer__discount-more { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-top: 1px solid #f0f0f0; font-size: 11px; color: #166534; font-weight: 500; }
-.tasslelife-cart-drawer__discount-view-all { background: none; border: none; color: #888; font-size: 11px; cursor: pointer; padding: 0; }
-.tasslelife-cart-drawer__discount-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #f0f0f0; }
-.tasslelife-cart-drawer__discount-input { flex: 1; padding: 7px 10px; border: 1px solid #e5e5e5; border-radius: 6px; font-size: 12px; text-transform: uppercase; outline: none; }
+/* ─── Discount & Coupons ─────────────────────────────────────────────────── */
+.tasslelife-cart-drawer__coupons-compact { border: 1px solid #bbf7d0; border-radius: 8px; background: #fff; overflow: hidden; }
+.tasslelife-cart-drawer__coupons-compact-top { display: flex; justify-content: space-between; align-items: center; padding: 12px; }
+.tasslelife-cart-drawer__coupons-compact-left { display: flex; align-items: flex-start; gap: 8px; }
+.tasslelife-cart-drawer__coupons-compact-text { display: flex; flex-direction: column; }
+.tasslelife-cart-drawer__coupons-compact-text strong { color: #166534; font-size: 14px; font-weight: 600; margin: 0; line-height: 1.2; }
+.tasslelife-cart-drawer__coupons-compact-text small { color: #555; font-size: 12px; margin: 2px 0 0; }
+.tasslelife-cart-drawer__coupons-compact-apply { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 4px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.tasslelife-cart-drawer__coupons-compact-apply:hover { background: #dcfce7; }
+.tasslelife-cart-drawer__coupons-compact-bottom { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #f8fafc; border-top: 1px solid #f1f5f9; cursor: pointer; }
+.tasslelife-cart-drawer__coupons-compact-bottom span { font-size: 12px; color: #166534; font-weight: 500; }
+.tasslelife-cart-drawer__coupons-compact-link { font-size: 12px; color: #64748b; }
+
+.tasslelife-cart-drawer__discount-row { display: flex; gap: 8px; padding: 0; margin-top: 10px; }
+.tasslelife-cart-drawer__discount-input { flex: 1; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 6px; font-size: 13px; text-transform: uppercase; outline: none; }
 .tasslelife-cart-drawer__discount-input:focus { border-color: #166534; box-shadow: 0 0 0 2px rgba(22,101,52,0.08); }
-.tasslelife-cart-drawer__discount-btn { padding: 7px 14px; background: #166534; color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.tasslelife-cart-drawer__discount-msg { padding: 0 12px 8px; font-size: 11px; margin: 0; color: #888; }
+.tasslelife-cart-drawer__discount-btn { padding: 10px 16px; background: #111; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.2s opacity; }
+.tasslelife-cart-drawer__discount-btn:hover { opacity: 0.8; }
+.tasslelife-cart-drawer__discount-msg { padding: 8px 0 0; font-size: 12px; margin: 0; color: #888; }
 .tasslelife-cart-drawer__discount-msg.is-success { color: #166534; }
 .tasslelife-cart-drawer__discount-msg.is-error { color: #dc2626; }
+
+/* ─── Coupons Modal ──────────────────────────────────────────────────────── */
+.tasslelife-cart-drawer__coupons-modal {
+  position: fixed; bottom: 0; right: 0; width: var(--tasslelife-cart-drawer-width); max-width: 100vw; height: 75vh;
+  background: #f9fafb; z-index: 100000; display: flex; flex-direction: column;
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-top-left-radius: 16px; border-top-right-radius: 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+}
+.tasslelife-cart-drawer__coupons-modal.is-open { transform: translateY(0); }
+.tasslelife-cart-drawer__coupons-modal-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e5e5e5; background: #fff; border-top-left-radius: 16px; border-top-right-radius: 16px; }
+.tasslelife-cart-drawer__coupons-modal-back { background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tasslelife-cart-drawer__coupons-modal-title { font-size: 16px; font-weight: 600; margin: 0; color: #111; }
+.tasslelife-cart-drawer__coupons-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+.tasslelife-cart-drawer__coupons-list-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 12px; }
+
+/* Coupon Card */
+.tasslelife-cart-drawer__coupon-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px; margin-bottom: 12px; position: relative; }
+.tasslelife-cart-drawer__coupon-card.is-available { background: linear-gradient(180deg, #fff 0%, #fdf2f8 100%); border-color: #fbcfe8; }
+.tasslelife-cart-drawer__coupon-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.tasslelife-cart-drawer__coupon-code { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: #111; }
+.tasslelife-cart-drawer__coupon-apply-btn { background: #be185d; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s opacity; }
+.tasslelife-cart-drawer__coupon-apply-btn:hover { opacity: 0.8; }
+.tasslelife-cart-drawer__coupon-desc { font-size: 13px; font-weight: 600; color: #333; margin: 0 0 2px; }
+.tasslelife-cart-drawer__coupon-cond { font-size: 12px; color: #666; margin: 0 0 12px; }
+.tasslelife-cart-drawer__coupon-save-msg { font-size: 13px; font-weight: 600; color: #166534; margin: 0 0 12px; }
+.tasslelife-cart-drawer__coupon-view-more { font-size: 11px; color: #64748b; cursor: pointer; margin: 0; }
+.tasslelife-cart-drawer__coupon-shortfall { font-size: 13px; color: #e11d48; margin: 12px 0 0; }
+.tasslelife-cart-drawer__coupon-card.is-unavailable .tasslelife-cart-drawer__coupon-code { color: #888; }
+.tasslelife-cart-drawer__coupon-card.is-unavailable .tasslelife-cart-drawer__coupon-desc,
+.tasslelife-cart-drawer__coupon-card.is-unavailable .tasslelife-cart-drawer__coupon-cond { color: #888; }
 
 /* ─── Upsell ──────────────────────────────────────────────────────────────── */
 .tasslelife-cart-drawer__upsell { padding: 0 16px 12px; }
@@ -140,12 +171,12 @@ body.tasslelife-cart-drawer-open { overflow: hidden; }
 
 /* ─── Gift Wrap ───────────────────────────────────────────────────────────── */
 .tasslelife-cart-drawer__gift-wrap { padding: 0 16px 12px; }
-.tasslelife-cart-drawer__gift-wrap-inner { background: #fff; border-radius: 8px; display: flex; align-items: center; padding: 10px 14px; gap: 10px; border: 1px solid #e5e5e5; }
-.tasslelife-cart-drawer__gift-icon-box { width: 32px; height: 32px; background: #fce4ec; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tasslelife-cart-drawer__gift-wrap-inner { background: #f8f8f8; border-radius: 8px; display: flex; align-items: center; padding: 12px 16px; gap: 14px; border: none; }
+.tasslelife-cart-drawer__gift-icon-box { width: 44px; height: 44px; background: #ffdef0; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .tasslelife-cart-drawer__gift-text { flex: 1; }
-.tasslelife-cart-drawer__gift-title { font-size: 12px; font-weight: 600; color: #222; margin: 0 0 2px; }
-.tasslelife-cart-drawer__gift-price { font-size: 11px; color: #888; margin: 0; }
-.tasslelife-cart-drawer__gift-btn { color: #a10061; font-size: 13px; font-weight: 700; background: none; border: none; cursor: pointer; padding: 0; transition: opacity 0.2s; flex-shrink: 0; }
+.tasslelife-cart-drawer__gift-title { font-size: 14px; font-weight: 500; color: #1a2a40; margin: 0 0 2px; letter-spacing: 0; }
+.tasslelife-cart-drawer__gift-price { font-size: 13px; color: #888; margin: 0; }
+.tasslelife-cart-drawer__gift-btn { color: #a10061; font-size: 14px; font-weight: 600; background: none; border: none; cursor: pointer; padding: 0; transition: opacity 0.2s; flex-shrink: 0; letter-spacing: 0; }
 .tasslelife-cart-drawer__gift-btn:hover { opacity: 0.75; }
 .tasslelife-cart-drawer__gift-btn.is-added { color: #888; }
 
