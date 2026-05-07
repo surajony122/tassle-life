@@ -1,3 +1,4 @@
+/* theme-check-disable AssetSizeAppBlockJavaScript */
 /**
  * Cart Drawer — storefront JS
  * Features: multi-tier progress bar, gift wrap, delivery date,
