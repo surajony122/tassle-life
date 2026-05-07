@@ -249,7 +249,7 @@ class TasslelifeCartDrawer {
     this.giftWrapAddBtn  = section.querySelector('#tasslelife-cart-drawer-gift-wrap');
     if (!this.giftWrapAddBtn || !this.giftWrapVariantId) return;
 
-    this.giftWrapAddBtn.addEventListener('click', async e => {
+    this.giftWrapAddBtn.addEventListener('click', async () => {
       if (this.isUpdating) return;
       const adding = this.giftWrapAddBtn.textContent.trim() === '+ Add';
       await this.handleGiftWrap(adding);
@@ -509,55 +509,26 @@ class TasslelifeCartDrawer {
     const timeline = document.getElementById('tasslelife-cart-drawer-timeline');
     if (!timeline) return;
 
-    const fulfillMin = parseInt(timeline.dataset.fulfillMin, 10) || 4;
-    const fulfillMax = parseInt(timeline.dataset.fulfillMax, 10) || 5;
+    const fulfillMin  = parseInt(timeline.dataset.fulfillMin,  10) || 4;
+    const fulfillMax  = parseInt(timeline.dataset.fulfillMax,  10) || 5;
     const deliveryMin = parseInt(timeline.dataset.deliveryMin, 10) || 10;
     const deliveryMax = parseInt(timeline.dataset.deliveryMax, 10) || 11;
 
-    const today = new Date();
-    
-    const formatDate = (date) => {
-      const parts = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).split(' ');
-      return `${parts[0]} ${parts[1]}`;
-    };
+    const today   = new Date();
+    const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+    const fmt     = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    const addDays = (date, days) => {
-      const result = new Date(date);
-      result.setDate(result.getDate() + days);
-      return result;
-    };
+    const todayEl   = document.getElementById('tasslelife-cart-drawer-timeline-today');
+    const fulfillEl = document.getElementById('tasslelife-cart-drawer-timeline-fulfill');
+    const deliverEl = document.getElementById('tasslelife-cart-drawer-timeline-deliver');
 
-    const todayEl = document.getElementById('today');
-    const fulfillEl = document.getElementById('shipping');
-    const deliverEl = document.getElementById('delivery');
-    const fulfillDaysEl = document.getElementById('shipping-days');
-    const deliverDaysEl = document.getElementById('delivery-days');
-
-    if (todayEl) todayEl.textContent = formatDate(today);
-    
-    if (fulfillEl) {
-      const fMin = formatDate(addDays(today, fulfillMin));
-      const fMax = formatDate(addDays(today, fulfillMax));
-      fulfillEl.textContent = `${fMin} - ${fMax}`;
-    }
-
-    if (deliverEl) {
-      const dMin = formatDate(addDays(today, deliveryMin));
-      const dMax = formatDate(addDays(today, deliveryMax));
-      deliverEl.textContent = `${dMin} - ${dMax}`;
-    }
-
-    if (fulfillDaysEl) {
-      fulfillDaysEl.textContent = fulfillMin === fulfillMax 
-        ? `${fulfillMin} Day${fulfillMin !== 1 ? 's' : ''}` 
-        : `${fulfillMin} to ${fulfillMax} Days`;
-    }
-
-    if (deliverDaysEl) {
-      deliverDaysEl.textContent = deliveryMin === deliveryMax 
-        ? `${deliveryMin} Day${deliveryMin !== 1 ? 's' : ''}` 
-        : `${deliveryMin} to ${deliveryMax} Days`;
-    }
+    if (todayEl)   todayEl.textContent   = fmt(today);
+    if (fulfillEl) fulfillEl.textContent = fulfillMin === fulfillMax
+      ? fmt(addDays(today, fulfillMin))
+      : `${fmt(addDays(today, fulfillMin))} – ${fmt(addDays(today, fulfillMax))}`;
+    if (deliverEl) deliverEl.textContent = deliveryMin === deliveryMax
+      ? fmt(addDays(today, deliveryMin))
+      : `${fmt(addDays(today, deliveryMin))} – ${fmt(addDays(today, deliveryMax))}`;
   }
 
   // ─── Cart API ─────────────────────────────────────────────────────────────
@@ -776,42 +747,104 @@ class TasslelifeCartDrawer {
 
   renderUpsell(cart) {
     if (!this.upsellSection || !this.upsellItems) return;
-    const firstItem = cart.items?.[0];
-    if (!firstItem || cart.item_count === 0) {
-      this.upsellSection.style.display = 'none';
+    if (cart.item_count === 0) { this.upsellSection.style.display = 'none'; return; }
+
+    const mode           = this.upsellSection.dataset.upsellMode || 'ai';
+    const cartProductIds = cart.items.map(i => i.product_id);
+
+    if (mode === 'manual') {
+      // Products were resolved server-side and injected as a JSON script tag
+      const dataEl = document.getElementById('tasslelife-upsell-products');
+      if (!dataEl) { this.upsellSection.style.display = 'none'; return; }
+      let products;
+      try { products = JSON.parse(dataEl.textContent); } catch { products = []; }
+      products = products.filter(p => !cartProductIds.includes(p.id));
+      if (!products.length) { this.upsellSection.style.display = 'none'; return; }
+      this.upsellSection.style.display = 'block';
+      this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLManual(p)).join('');
+      this.bindUpsellEvents();
       return;
     }
-    const cartProductIds = cart.items.map(i => i.product_id);
+
+    if (mode === 'collection') {
+      const handle = this.upsellSection.dataset.upsellCollection;
+      if (!handle) { this.upsellSection.style.display = 'none'; return; }
+      fetch(`/collections/${encodeURIComponent(handle)}/products.json?limit=6`)
+        .then(r => r.json())
+        .then(data => {
+          const products = (data.products || []).filter(p => !cartProductIds.includes(p.id)).slice(0, 4);
+          if (!products.length) { this.upsellSection.style.display = 'none'; return; }
+          this.upsellSection.style.display = 'block';
+          this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLAi(p)).join('');
+          this.bindUpsellEvents();
+        })
+        .catch(() => { this.upsellSection.style.display = 'none'; });
+      return;
+    }
+
+    // Default: AI / Shopify recommendations
+    const firstItem = cart.items[0];
     fetch(`/recommendations/products.json?product_id=${firstItem.product_id}&limit=4&intent=related`)
       .then(r => r.json())
       .then(data => {
         const products = (data.products || []).filter(p => !cartProductIds.includes(p.id));
         if (!products.length) { this.upsellSection.style.display = 'none'; return; }
         this.upsellSection.style.display = 'block';
-        this.upsellItems.innerHTML = products.map(p => this.upsellItemHTML(p)).join('');
+        this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLAi(p)).join('');
         this.bindUpsellEvents();
       })
       .catch(() => { this.upsellSection.style.display = 'none'; });
   }
 
-  upsellItemHTML(product) {
-    const variant = product.variants?.[0];
+  // For AI / collection mode — product object from Shopify AJAX API (prices already in cents)
+  upsellItemHTMLAi(product) {
+    const variant      = product.variants?.[0];
     if (!variant) return '';
-    const imgHTML = product.featured_image ? `<img src="${product.featured_image}" alt="${this.escape(product.title)}" loading="lazy">` : '';
-    
+    const price        = variant.price || 0;
+    const comparePrice = variant.compare_at_price || 0;
+    const imgHTML      = product.featured_image
+      ? `<img src="${product.featured_image}" alt="${this.escape(product.title)}" loading="lazy">`
+      : '';
+    const badgeHTML    = comparePrice > price
+      ? `<div class="tasslelife-cart-drawer__upsell-badge">${Math.round((1 - price / comparePrice) * 100)}% OFF</div>`
+      : '';
+    const priceHTML    = comparePrice > price
+      ? `<s class="tasslelife-cart-drawer__upsell-compare">${this.formatMoney(comparePrice)}</s>
+         <span class="tasslelife-cart-drawer__upsell-final">${this.formatMoney(price)}</span>`
+      : `<span class="tasslelife-cart-drawer__upsell-final">${this.formatMoney(price)}</span>`;
     return `
       <div class="tasslelife-cart-drawer__upsell-card">
-        <div class="tasslelife-cart-drawer__upsell-img-wrap">
-          ${imgHTML}
-          <div class="tasslelife-cart-drawer__upsell-badge">25% OFF</div>
-        </div>
+        <div class="tasslelife-cart-drawer__upsell-img-wrap">${imgHTML}${badgeHTML}</div>
         <div class="tasslelife-cart-drawer__upsell-card-body">
           <p class="tasslelife-cart-drawer__upsell-name">${this.escape(product.title)}</p>
-          <p class="tasslelife-cart-drawer__upsell-price">
-            <s class="tasslelife-cart-drawer__upsell-compare">${this.formatMoney(variant.price * 100 * 1.33)}</s> 
-            <span class="tasslelife-cart-drawer__upsell-final">${this.formatMoney(variant.price * 100)}</span>
-          </p>
+          <p class="tasslelife-cart-drawer__upsell-price">${priceHTML}</p>
           <button class="tasslelife-cart-drawer__upsell-add-btn" data-variant-id="${variant.id}">+ ADD</button>
+        </div>
+      </div>`;
+  }
+
+  // For manual mode — product object resolved server-side via Liquid (prices are in cents already)
+  upsellItemHTMLManual(product) {
+    if (!product.variant_id) return '';
+    const price        = product.price || 0;
+    const comparePrice = product.compare_price || 0;
+    const imgHTML      = product.image
+      ? `<img src="${product.image}" alt="${this.escape(product.title)}" loading="lazy">`
+      : '';
+    const badgeHTML    = comparePrice > price
+      ? `<div class="tasslelife-cart-drawer__upsell-badge">${Math.round((1 - price / comparePrice) * 100)}% OFF</div>`
+      : '';
+    const priceHTML    = comparePrice > price
+      ? `<s class="tasslelife-cart-drawer__upsell-compare">${this.formatMoney(comparePrice)}</s>
+         <span class="tasslelife-cart-drawer__upsell-final">${this.formatMoney(price)}</span>`
+      : `<span class="tasslelife-cart-drawer__upsell-final">${this.formatMoney(price)}</span>`;
+    return `
+      <div class="tasslelife-cart-drawer__upsell-card">
+        <div class="tasslelife-cart-drawer__upsell-img-wrap">${imgHTML}${badgeHTML}</div>
+        <div class="tasslelife-cart-drawer__upsell-card-body">
+          <p class="tasslelife-cart-drawer__upsell-name">${this.escape(product.title)}</p>
+          <p class="tasslelife-cart-drawer__upsell-price">${priceHTML}</p>
+          <button class="tasslelife-cart-drawer__upsell-add-btn" data-variant-id="${product.variant_id}">+ ADD</button>
         </div>
       </div>`;
   }

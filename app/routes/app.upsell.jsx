@@ -1,211 +1,256 @@
 import { useLoaderData, useFetcher, useRouteError } from "react-router";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 
-const UPSELL_NAMESPACE = "cart_drawer";
-const UPSELL_KEY = "upsell_products";
+const NAMESPACE = "cart_drawer";
+const KEY = "upsell_products";
+
+// ─── Server ────────────────────────────────────────────────────────────────
 
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
 
-  // Load saved upsell product IDs
-  const settingsRes = await admin.graphql(`
-    #graphql
-    query getUpsellSettings {
-      shop {
-        metafield(namespace: "${UPSELL_NAMESPACE}", key: "${UPSELL_KEY}") {
-          value
-        }
-      }
-    }
-  `);
-  const { data: settingsData } = await settingsRes.json();
-  const savedIds = settingsData?.shop?.metafield?.value
-    ? JSON.parse(settingsData.shop.metafield.value)
-    : [];
-
-  // Load first 20 products for the picker
-  const productsRes = await admin.graphql(`
-    #graphql
-    query getProducts {
-      products(first: 20, sortKey: TITLE) {
-        edges {
-          node {
-            id
-            title
-            handle
-            status
-            featuredImage {
-              url
-              altText
-            }
-            variants(first: 1) {
-              edges {
-                node {
-                  price
-                }
-              }
+  const [settingsRes, productsRes] = await Promise.all([
+    admin.graphql(`
+      #graphql
+      query { shop { metafield(namespace: "${NAMESPACE}", key: "${KEY}") { value } } }
+    `),
+    admin.graphql(`
+      #graphql
+      query {
+        products(first: 20, sortKey: TITLE) {
+          edges {
+            node {
+              id title handle status
+              featuredImage { url altText }
+              variants(first: 1) { edges { node { price } } }
             }
           }
         }
       }
-    }
-  `);
-  const { data: productsData } = await productsRes.json();
-  const products = productsData?.products?.edges?.map(e => e.node) || [];
+    `),
+  ]);
 
-  return { products, savedIds };
+  const { data: sd } = await settingsRes.json();
+  const raw = sd?.shop?.metafield?.value;
+  let saved;
+  try {
+    const parsed = raw ? JSON.parse(raw) : null;
+    // Handle legacy format where we saved an array of GIDs
+    saved = Array.isArray(parsed) || !parsed
+      ? { mode: "ai", collection: "", handles: [] }
+      : { mode: "ai", collection: "", handles: [], ...parsed };
+  } catch {
+    saved = { mode: "ai", collection: "", handles: [] };
+  }
+
+  const { data: pd } = await productsRes.json();
+  const products = pd?.products?.edges?.map(e => e.node) || [];
+
+  return { products, saved };
 };
 
 export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
-  const formData = await request.formData();
+  const fd = await request.formData();
 
-  // Collect all checked product IDs
-  const selectedIds = formData.getAll("productId");
+  const mode = fd.get("mode") || "ai";
+  const collection = fd.get("collection") || "";
+  const handles = fd.getAll("handle");
 
   const shopRes = await admin.graphql(`#graphql query { shop { id } }`);
   const { data: shopData } = await shopRes.json();
-  const shopId = shopData.shop.id;
 
   const res = await admin.graphql(
     `#graphql
     mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
       metafieldsSet(metafields: $metafields) {
-        metafields { id key }
+        metafields { id }
         userErrors { field message }
       }
     }`,
     {
       variables: {
-        metafields: [
-          {
-            ownerId: shopId,
-            namespace: UPSELL_NAMESPACE,
-            key: UPSELL_KEY,
-            type: "json",
-            value: JSON.stringify(selectedIds),
-          },
-        ],
+        metafields: [{
+          ownerId: shopData.shop.id,
+          namespace: NAMESPACE,
+          key: KEY,
+          type: "json",
+          value: JSON.stringify({ mode, collection, handles }),
+        }],
       },
     }
   );
 
   const { data } = await res.json();
   const errors = data?.metafieldsSet?.userErrors || [];
-  if (errors.length) {
-    return { success: false, errors };
-  }
-
-  return { success: true, selectedIds };
+  if (errors.length) return { success: false, errors };
+  return { success: true, saved: { mode, collection, handles } };
 };
 
+// ─── UI helpers ────────────────────────────────────────────────────────────
+
+const inputStyle = {
+  width: "100%", padding: "8px 10px", border: "1px solid #c9cccf",
+  borderRadius: 6, fontSize: 14, color: "#202223", background: "#fff",
+  boxSizing: "border-box", outline: "none", fontFamily: "inherit",
+};
+const labelStyle = { display: "block", fontSize: 13, fontWeight: 500, color: "#202223", marginBottom: 4 };
+const helpStyle  = { fontSize: 12, color: "#6d7175", marginTop: 4, margin: "4px 0 0" };
+
+function SectionCard({ heading, children }) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e1e3e5", borderRadius: 8, padding: "20px 24px", marginBottom: 16 }}>
+      {heading && <h2 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px", color: "#202223" }}>{heading}</h2>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{children}</div>
+    </div>
+  );
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────
+
 export default function UpsellPage() {
-  const { products, savedIds } = useLoaderData();
+  const { products, saved } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
 
-  const isSaving = ["loading", "submitting"].includes(fetcher.state);
-  const currentIds = fetcher.data?.selectedIds || savedIds;
+  const [mode, setMode]             = useState(saved.mode);
+  const [collection, setCollection] = useState(saved.collection);
+  const [handles, setHandles]       = useState(new Set(saved.handles));
+
+  const isSaving = fetcher.state !== "idle";
 
   useEffect(() => {
     if (fetcher.data?.success) {
-      shopify.toast.show("Upsell products saved!");
+      shopify.toast.show("Upsell settings saved!");
+      if (fetcher.data.saved) {
+        setMode(fetcher.data.saved.mode);
+        setCollection(fetcher.data.saved.collection);
+        setHandles(new Set(fetcher.data.saved.handles));
+      }
     }
-    if (fetcher.data?.errors?.length) {
-      shopify.toast.show("Error saving upsell products", { isError: true });
-    }
+    if (fetcher.data?.errors?.length) shopify.toast.show("Error saving upsell settings", { isError: true });
   }, [fetcher.data, shopify]);
 
+  const toggleHandle = (handle) => {
+    setHandles(prev => {
+      const next = new Set(prev);
+      if (next.has(handle)) next.delete(handle); else next.add(handle);
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    const fd = new FormData();
+    fd.append("mode", mode);
+    fd.append("collection", collection);
+    handles.forEach(h => fd.append("handle", h));
+    fetcher.submit(fd, { method: "POST" });
+  };
+
+  const modeDescriptions = {
+    ai:         "Shopify automatically picks related products based on what's already in the cart.",
+    manual:     "Handpick up to 6 products to always show as recommendations.",
+    collection: "Enter a collection handle — products from that collection rotate as recommendations.",
+  };
+
   return (
-    <s-page heading="Upsell Products">
+    <s-page heading="Upsell Recommendations">
 
-      <s-section heading="How upsell works">
-        <s-paragraph>
-          Select products below that will appear as recommendations inside the cart drawer.
-          If no products are selected, the drawer uses Shopify&apos;s automatic product
-          recommendations based on what&apos;s already in the cart.
-        </s-paragraph>
-      </s-section>
+      <SectionCard heading="Recommendation Mode">
+        <div>
+          <label style={labelStyle}>Source</label>
+          <select value={mode} onChange={e => setMode(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
+            <option value="ai">AI / Automatic</option>
+            <option value="manual">Manual — pick specific products</option>
+            <option value="collection">Collection</option>
+          </select>
+          <p style={helpStyle}>{modeDescriptions[mode]}</p>
+        </div>
 
-      <fetcher.Form method="POST">
-        <s-section heading="Select products to recommend">
-          <s-stack direction="block" gap="base">
+        {mode === "collection" && (
+          <div>
+            <label style={labelStyle}>Collection handle</label>
+            <input
+              type="text"
+              value={collection}
+              onChange={e => setCollection(e.target.value)}
+              placeholder="e.g. best-sellers"
+              style={inputStyle}
+            />
+            <p style={helpStyle}>
+              Find it in Admin → Collections → click the collection → it's the slug after /collections/ in the URL.
+            </p>
+          </div>
+        )}
+      </SectionCard>
 
-            {products.length === 0 && (
-              <s-paragraph>No products found in your store.</s-paragraph>
-            )}
+      {mode === "manual" && (
+        <SectionCard heading={`Select Products — ${handles.size} selected`}>
+          {products.length === 0 && (
+            <p style={helpStyle}>No products found in your store.</p>
+          )}
+          {products.map(product => {
+            const checked  = handles.has(product.handle);
+            const price    = product.variants?.edges?.[0]?.node?.price;
+            const imageUrl = product.featuredImage?.url;
+            return (
+              <div
+                key={product.id}
+                onClick={() => toggleHandle(product.handle)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "10px 12px",
+                  border: `1px solid ${checked ? "#2c6ecb" : "#e1e3e5"}`,
+                  borderRadius: 8, cursor: "pointer",
+                  background: checked ? "#f4f6f8" : "#fff",
+                }}
+              >
+                {imageUrl && (
+                  <img
+                    src={imageUrl}
+                    alt={product.featuredImage?.altText || product.title}
+                    width={48} height={48}
+                    style={{ objectFit: "cover", borderRadius: 4, flexShrink: 0 }}
+                  />
+                )}
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: 500, fontSize: 14, color: "#202223" }}>{product.title}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 13, color: "#6d7175" }}>
+                    {price ? `$${price}` : "—"} &nbsp;·&nbsp; handle: <code>{product.handle}</code>
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {}}
+                  onClick={e => e.stopPropagation()}
+                  style={{ width: 18, height: 18, flexShrink: 0 }}
+                />
+              </div>
+            );
+          })}
+          {handles.size === 0 && (
+            <p style={helpStyle}>Select products above. If none are selected, Shopify automatic recommendations are used as fallback.</p>
+          )}
+        </SectionCard>
+      )}
 
-            {products.map(product => {
-              const isChecked = currentIds.includes(product.id);
-              const price = product.variants?.edges?.[0]?.node?.price;
-              const imageUrl = product.featuredImage?.url;
-
-              return (
-                <s-box
-                  key={product.id}
-                  padding="base"
-                  borderWidth="base"
-                  borderRadius="base"
-                  background={isChecked ? "highlight" : "default"}
-                >
-                  <s-stack direction="inline" gap="base" blockAlign="center">
-                    {imageUrl && (
-                      <img
-                        src={imageUrl}
-                        alt={product.featuredImage?.altText || product.title}
-                        width={48}
-                        height={48}
-                        style={{ objectFit: "cover", borderRadius: 4, flexShrink: 0 }}
-                      />
-                    )}
-                    <s-stack direction="block" gap="none" style={{ flex: 1 }}>
-                      <s-text emphasis>{product.title}</s-text>
-                      {price && <s-text subdued>${price}</s-text>}
-                      <s-text subdued style={{ fontSize: 12 }}>
-                        {product.status === "ACTIVE" ? "Active" : "Draft"}
-                      </s-text>
-                    </s-stack>
-                    <input
-                      type="checkbox"
-                      name="productId"
-                      value={product.id}
-                      defaultChecked={isChecked}
-                      style={{ width: 18, height: 18, cursor: "pointer" }}
-                    />
-                  </s-stack>
-                </s-box>
-              );
-            })}
-
-            <s-paragraph subdued>
-              {currentIds.length === 0
-                ? "No products selected — Shopify automatic recommendations will be used."
-                : `${currentIds.length} product(s) selected as upsell recommendations.`}
-            </s-paragraph>
-
-            <s-button
-              submit
-              variant="primary"
-              {...(isSaving ? { loading: true } : {})}
-            >
-              Save upsell products
-            </s-button>
-
-          </s-stack>
-        </s-section>
-      </fetcher.Form>
+      <div style={{ paddingBottom: 32 }}>
+        <s-button
+          variant="primary"
+          onClick={handleSave}
+          {...(isSaving ? { loading: true } : {})}
+        >
+          {isSaving ? "Saving..." : "Save upsell settings"}
+        </s-button>
+      </div>
 
     </s-page>
   );
 }
 
-export function ErrorBoundary() {
-  return boundary.error(useRouteError());
-}
-
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};
+export function ErrorBoundary() { return boundary.error(useRouteError()); }
+export const headers = h => boundary.headers(h);

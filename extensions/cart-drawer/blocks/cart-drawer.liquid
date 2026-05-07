@@ -5,6 +5,8 @@
 {% endcomment %}
 
 {% assign s = shop.metafields.cart_drawer.settings.value %}
+{% assign u = shop.metafields.cart_drawer.upsell_products.value %}
+{% assign dr = shop.metafields.cart_drawer.delivery_rules.value %}
 
 <div id="tasslelife-cart-drawer-overlay" class="tasslelife-cart-drawer__overlay" aria-hidden="true"></div>
 
@@ -65,10 +67,38 @@
 
     <!-- Upsell -->
     {% if s.enableUpsell != false %}
-    <div id="tasslelife-cart-drawer-upsell" class="tasslelife-cart-drawer__upsell" style="display:none;">
+    {% assign upsell_mode = u.mode | default: 'ai' %}
+    <div
+      id="tasslelife-cart-drawer-upsell"
+      class="tasslelife-cart-drawer__upsell"
+      style="display:none;"
+      data-upsell-mode="{{ upsell_mode }}"
+      {% if upsell_mode == 'collection' and u.collection != blank %}
+      data-upsell-collection="{{ u.collection | escape }}"
+      {% endif %}
+    >
       <h3 class="tasslelife-cart-drawer__upsell-title">You might also like</h3>
       <div id="tasslelife-cart-drawer-upsell-items" class="tasslelife-cart-drawer__upsell-items"></div>
     </div>
+    {% comment %} For manual mode: resolve product handles server-side and inject as JSON {% endcomment %}
+    {% if upsell_mode == 'manual' and u.handles %}
+      {% assign upsell_manual_items = '' %}
+      {% assign upsell_manual_count = 0 %}
+      {% for handle in u.handles %}
+        {% if upsell_manual_count < 6 %}
+          {% assign p = all_products[handle] %}
+          {% if p.id > 0 %}
+            {% if upsell_manual_count > 0 %}{% assign upsell_manual_items = upsell_manual_items | append: ',' %}{% endif %}
+            {% capture pjson %}{"id":{{ p.id }},"title":{{ p.title | json }},"handle":{{ p.handle | json }},"url":{{ p.url | json }},"image":{% if p.featured_image %}{{ p.featured_image | image_url: width: 300 | json }}{% else %}null{% endif %},"price":{{ p.price }},"compare_price":{{ p.compare_at_price | default: 0 }},"variant_id":{{ p.first_available_variant.id }}}{% endcapture %}
+            {% assign upsell_manual_items = upsell_manual_items | append: pjson %}
+            {% assign upsell_manual_count = upsell_manual_count | plus: 1 %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      <script id="tasslelife-upsell-products" type="application/json">
+        [{{ upsell_manual_items }}]
+      </script>
+    {% endif %}
     {% endif %}
 
     <!-- Gift Wrap -->
@@ -152,11 +182,39 @@
 
     <!-- Delivery Timeline -->
     {% if s.enableDeliveryTimeline != false %}
+
+    {% comment %} Determine date window: collection rules override settings defaults {% endcomment %}
+    {% assign tl_fulfill_min = s.timelineFulfillMin | default: 4 %}
+    {% assign tl_fulfill_max = s.timelineFulfillMax | default: 5 %}
+    {% assign tl_delivery_min = s.timelineDeliveryMin | default: 10 %}
+    {% assign tl_delivery_max = s.timelineDeliveryMax | default: 11 %}
+
+    {% if dr.rules %}
+      {% assign tl_rule_found = false %}
+      {% for item in cart.items %}
+        {% unless tl_rule_found %}
+          {% for collection in item.product.collections %}
+            {% unless tl_rule_found %}
+              {% for rule in dr.rules %}
+                {% if rule.collection == collection.handle %}
+                  {% assign tl_fulfill_min = rule.fulfillMin %}
+                  {% assign tl_fulfill_max = rule.fulfillMax %}
+                  {% assign tl_delivery_min = rule.deliveryMin %}
+                  {% assign tl_delivery_max = rule.deliveryMax %}
+                  {% assign tl_rule_found = true %}
+                {% endif %}
+              {% endfor %}
+            {% endunless %}
+          {% endfor %}
+        {% endunless %}
+      {% endfor %}
+    {% endif %}
+
     <div class="tasslelife-cart-drawer__timeline-container" id="tasslelife-cart-drawer-timeline"
-         data-fulfill-min="{{ s.timelineFulfillMin | default: 4 }}"
-         data-fulfill-max="{{ s.timelineFulfillMax | default: 5 }}"
-         data-delivery-min="{{ s.timelineDeliveryMin | default: 10 }}"
-         data-delivery-max="{{ s.timelineDeliveryMax | default: 11 }}">
+         data-fulfill-min="{{ tl_fulfill_min }}"
+         data-fulfill-max="{{ tl_fulfill_max }}"
+         data-delivery-min="{{ tl_delivery_min }}"
+         data-delivery-max="{{ tl_delivery_max }}">
       <div class="tasslelife-cart-drawer__timeline-item">
         <div class="tasslelife-cart-drawer__timeline-icon">🤲🪙</div>
         <p class="tasslelife-cart-drawer__timeline-date" id="tasslelife-cart-drawer-timeline-today"></p>
