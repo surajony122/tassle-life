@@ -1,4 +1,10 @@
 services:
+  - type: psql
+    name: tasslelife-db
+    plan: free
+    databaseName: tasslelife_db
+    user: tasslelife_user
+
   - type: web
     name: tasslelife-cart
     runtime: docker
@@ -13,7 +19,9 @@ services:
       - key: SHOPIFY_APP_URL
         value: https://tasslelife-cart.onrender.com
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: tasslelife-db
+          property: connectionString
       - key: SHOPIFY_API_KEY
         sync: false
       - key: SHOPIFY_API_SECRET
