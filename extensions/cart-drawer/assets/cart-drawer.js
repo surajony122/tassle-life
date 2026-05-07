@@ -54,6 +54,7 @@ class TasslelifeCartDrawer {
     this.initNote();
     this.initDiscount();
     this.initTimeline();
+    this.initSavingsRow();
   }
 
   readProgressTiers() {
@@ -78,6 +79,11 @@ class TasslelifeCartDrawer {
     this.overlay.classList.add('is-visible');
     document.body.classList.add('tasslelife-cart-drawer-open');
     this.drawer.setAttribute('aria-hidden', 'false');
+    // Suppress the theme's own cart drawer/notification (runs at 0 / 150 / 400ms
+    // to cover themes that open their cart asynchronously after the fetch resolves)
+    this.suppressThemeCart();
+    setTimeout(() => this.suppressThemeCart(), 150);
+    setTimeout(() => this.suppressThemeCart(), 400);
   }
 
   close() {
@@ -100,23 +106,27 @@ class TasslelifeCartDrawer {
   }
 
   interceptCartIconLinks() {
-    // Only use clearly-cart-icon selectors — NOT [data-cart-toggle] or .icon-cart
-    // which are also used on Add to Cart buttons in many themes
+    // Selectors for cart icon links/buttons — safe ones that are never also ATC buttons
     const safeSelectors = [
       'a[href="/cart"]',
+      '#cart-icon-bubble',
       '.cart-icon-bubble',
       '.header__icon--cart',
-      '#cart-icon-bubble',
+      'a[href="/cart/show"]',
+      '[data-cart-icon]',
+      '.cart__icon',
     ].join(',');
 
     const bindIcons = (root = document) => {
       root.querySelectorAll(safeSelectors).forEach(el => {
         if (el._cartDrawerBound) return;
         el._cartDrawerBound = true;
+        // Capture phase ensures we run before the theme's bubble-phase handler
         el.addEventListener('click', e => {
           e.preventDefault();
+          e.stopImmediatePropagation(); // stop theme's handler on same element
           this.open();
-        });
+        }, true);
       });
     };
 
@@ -125,7 +135,64 @@ class TasslelifeCartDrawer {
     // MutationObserver handles lazy-rendered headers (e.g. theme JS that inserts header after load)
     const observer = new MutationObserver(() => bindIcons());
     observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => observer.disconnect(), 8000); // stop watching after theme has settled
+    setTimeout(() => observer.disconnect(), 8000);
+  }
+
+  // ─── Suppress theme cart (Horizon + other themes) ────────────────────────
+
+  suppressThemeCart() {
+    // Elements to close — covers Horizon, Dawn, Refresh, and other common themes
+    const cartEls = [
+      '#cart-notification',
+      'cart-notification',
+      '#CartNotification',
+      '#CartDrawer',
+      '#cart-drawer',
+      'cart-drawer',
+      '#CartDrawerContainer',
+      '.cart-drawer',
+      '.cart-notification',
+      '[data-cart-drawer]',
+      '.js-cart-drawer',
+      '#mini-cart',
+      '.mini-cart',
+      '.ajax-cart',
+    ];
+    cartEls.forEach(sel => {
+      try {
+        document.querySelectorAll(sel).forEach(el => {
+          // Covers <details open>, aria-expanded, custom open attribute, visible classes
+          if (el.tagName === 'DETAILS') el.open = false;
+          el.removeAttribute('open');
+          el.setAttribute('aria-expanded', 'false');
+          el.setAttribute('aria-hidden', 'true');
+          el.classList.remove('is-open', 'is-active', 'active', 'open', 'is-visible',
+                              'animate-in', 'cart-open', 'drawer--open', 'show');
+          el.style.display === 'block' && (el.style.display = '');
+          // Horizon's cart-notification uses a close() method
+          if (typeof el.close === 'function') el.close();
+          if (typeof el.hide === 'function') el.hide();
+        });
+      } catch {}
+    });
+
+    // Body/html overflow classes that themes add when their cart is open
+    ['overflow-hidden', 'cart-is-open', 'drawer-open', 'is-cart-open', 'js-cart-open',
+     'cart-notification-open', 'prevent-scroll']
+      .forEach(cls => {
+        document.body.classList.remove(cls);
+        document.documentElement.classList.remove(cls);
+      });
+
+    // Overlays
+    ['#modal-overlay', '.overlay--cart', '.cart-overlay', '.js-cart-overlay',
+     '#CartOverlay', '.drawer__overlay']
+      .forEach(sel => {
+        try {
+          document.querySelectorAll(sel).forEach(el =>
+            el.classList.remove('is-visible', 'active', 'is-active', 'open'));
+        } catch {}
+      });
   }
 
   interceptAddToCart() {
@@ -178,14 +245,45 @@ class TasslelifeCartDrawer {
     };
 
     // ── Custom theme events ──────────────────────────────────────
-    document.addEventListener('cart:add', function () {
-      if (!self._skipIntercept) {
-        setTimeout(function () { try { self.open(); } catch (e) {} }, 50);
-      }
+    // These events are fired by various themes (Dawn, Horizon, Prestige, etc.)
+    ['cart:add', 'cart:item-added', 'product:added-to-cart', 'Shopify:cart-add-item'].forEach(evt => {
+      document.addEventListener(evt, function () {
+        if (!self._skipIntercept) {
+          setTimeout(function () { try { self.open(); } catch (e) {} }, 50);
+        }
+      });
     });
     document.addEventListener('cart:updated', function () {
       try { self.refresh(); } catch (e) {}
     });
+
+    // ── Horizon: intercept cart-notification show() before it renders ────
+    // Horizon calls cartNotification.renderContents() then show() after ATC
+    const patchCartNotification = () => {
+      const notif = document.querySelector('cart-notification');
+      if (notif && !notif._tasslelifePatchedOpen) {
+        notif._tasslelifePatchedOpen = true;
+        const originalOpen = notif.open?.bind(notif);
+        const originalShow = notif.show?.bind(notif);
+        if (typeof originalOpen === 'function') {
+          notif.open = function(...args) {
+            if (!self._skipIntercept) { self.suppressThemeCart(); return; }
+            return originalOpen(...args);
+          };
+        }
+        if (typeof originalShow === 'function') {
+          notif.show = function(...args) {
+            if (!self._skipIntercept) { self.suppressThemeCart(); return; }
+            return originalShow(...args);
+          };
+        }
+      }
+    };
+    // Try immediately, then watch for Horizon's lazy element upgrade
+    patchCartNotification();
+    const upgradeObserver = new MutationObserver(patchCartNotification);
+    upgradeObserver.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => upgradeObserver.disconnect(), 10000);
   }
 
   // ─── Form Submission Intercept (for non-AJAX themes) ────────────────────
@@ -409,8 +507,9 @@ class TasslelifeCartDrawer {
     });
   }
 
-  applyDiscount(code) {
+  applyDiscount(code, label) {
     sessionStorage.setItem('tasslelife_cart_drawer_discount', code);
+    if (label) sessionStorage.setItem('tasslelife_cart_drawer_discount_label', label);
     this.applyDiscountState(code);
   }
 
@@ -430,6 +529,7 @@ class TasslelifeCartDrawer {
 
   removeDiscount() {
     sessionStorage.removeItem('tasslelife_cart_drawer_discount');
+    sessionStorage.removeItem('tasslelife_cart_drawer_discount_label');
     if (this.discountInput) {
       this.discountInput.value    = '';
       this.discountInput.readOnly = false;
@@ -442,6 +542,56 @@ class TasslelifeCartDrawer {
       this.discountMsg.className   = 'tasslelife-cart-drawer__discount-msg';
     }
     this.updateCheckoutUrl(null);
+    this.updateSavingsDisplay(0);
+  }
+
+  // ─── Savings display ─────────────────────────────────────────────────────
+
+  initSavingsRow() {
+    if (!this.footer) return;
+    const subtotalRow = this.footer.querySelector('.tasslelife-cart-drawer__subtotal-row');
+    if (!subtotalRow) return;
+    const row = document.createElement('div');
+    row.id = 'tasslelife-cart-drawer-savings';
+    row.className = 'tasslelife-cart-drawer__savings-row';
+    row.style.display = 'none';
+    row.innerHTML = `
+      <span class="tasslelife-cart-drawer__savings-label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5L5 19M19 19L5 5"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Coupon savings
+      </span>
+      <span class="tasslelife-cart-drawer__savings-value" id="tasslelife-cart-drawer-savings-value">—</span>`;
+    subtotalRow.insertAdjacentElement('afterend', row);
+  }
+
+  parseSavings(label, cartTotalCents) {
+    if (!label) return 0;
+    const pct = label.match(/(\d+(?:\.\d+)?)\s*%/);
+    if (pct) return Math.round(cartTotalCents * parseFloat(pct[1]) / 100);
+    const dollar = label.match(/\$\s*(\d+(?:\.\d+)?)/);
+    if (dollar) return Math.round(parseFloat(dollar[1]) * 100);
+    return 0;
+  }
+
+  renderSavings(cart) {
+    const row = document.getElementById('tasslelife-cart-drawer-savings');
+    const valEl = document.getElementById('tasslelife-cart-drawer-savings-value');
+    if (!row) return;
+    const code  = sessionStorage.getItem('tasslelife_cart_drawer_discount');
+    const label = sessionStorage.getItem('tasslelife_cart_drawer_discount_label') || '';
+    if (!code) { row.style.display = 'none'; return; }
+    const savings = this.parseSavings(label, cart.total_price);
+    if (savings > 0) {
+      row.style.display = 'flex';
+      if (valEl) valEl.innerHTML = `-${this.formatMoney(savings)}`;
+    } else {
+      row.style.display = 'none';
+    }
+  }
+
+  updateSavingsDisplay(savings) {
+    const row = document.getElementById('tasslelife-cart-drawer-savings');
+    if (row) row.style.display = savings > 0 ? 'flex' : 'none';
   }
 
   updateCheckoutUrl(code) {
@@ -489,7 +639,7 @@ class TasslelifeCartDrawer {
         this.removeDiscount();
         this.refresh();
       } else {
-        this.applyDiscount(featured.code);
+        this.applyDiscount(featured.code, featured.label);
         this.refresh();
       }
     });
@@ -596,6 +746,7 @@ class TasslelifeCartDrawer {
     this.syncGiftWrap(cart);
     this.syncDeliveryDate(cart);
     this.syncNote(cart);
+    this.renderSavings(cart);
     this.toggleFooter(cart);
   }
 
