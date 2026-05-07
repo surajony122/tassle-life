@@ -1,9 +1,10 @@
-services:
-  - type: psql
-    name: tasslelife-db
+databases:
+  - name: tasslelife-db
     plan: free
     databaseName: tasslelife_db
     user: tasslelife_user
+
+services:
 
   - type: web
     name: tasslelife-cart
