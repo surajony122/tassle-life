@@ -647,7 +647,7 @@ class TasslelifeCartDrawer {
             ${c.code}
           </div>
           ${isAvailable ? `
-            <button class="tasslelife-cart-drawer__coupon-apply-btn" data-code="${c.code}" data-label="Save ${this.formatMoney(c.savings)}" data-state="${isApplied ? 'applied' : ''}">
+            <button class="tasslelife-cart-drawer__coupon-apply-btn" data-code="${c.code}" data-label="Save ${this.formatMoney(c.savings, true)}" data-state="${isApplied ? 'applied' : ''}">
               ${isApplied ? 'Applied' : 'Apply'}
             </button>
           ` : ''}
@@ -1119,11 +1119,12 @@ class TasslelifeCartDrawer {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  formatMoney(cents) {
+  formatMoney(cents, plain = false) {
     const formatted = new Intl.NumberFormat(undefined, {
       style: 'currency',
       currency: this.settings.currency,
     }).format(cents / 100);
+    if (plain) return formatted;
     return `<span class="money">${formatted}</span>`;
   }
 
