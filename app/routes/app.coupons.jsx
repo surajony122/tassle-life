@@ -145,8 +145,14 @@ export default function CouponsPage() {
 
   const handleSave = () => {
     const fd = new FormData();
-    // Filter out empty codes
-    const cleanCoupons = coupons.filter(c => c.code.trim() !== "");
+    // Filter out empty codes and auto-sort by threshold descending (highest first)
+    const cleanCoupons = coupons
+      .filter(c => c.code.trim() !== "")
+      .sort((a, b) => Number(b.minThreshold) - Number(a.minThreshold));
+      
+    // Update local state to reflect sorted order immediately
+    setCoupons(cleanCoupons);
+    
     fd.append("coupons", JSON.stringify(cleanCoupons));
     fetcher.submit(fd, { method: "POST" });
   };
@@ -162,6 +168,7 @@ export default function CouponsPage() {
         <p style={{ fontSize: 13, color: "#6d7175", marginBottom: 20 }}>
           These coupons will automatically appear in the Cart Drawer based on the user's cart subtotal. 
           If a user doesn't meet the threshold, they will see a "Add $X more to avail this offer" message.
+          <br/><strong>Note:</strong> Coupons are automatically sorted by highest threshold first when saving.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
