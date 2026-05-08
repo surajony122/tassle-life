@@ -2,7 +2,7 @@
 
 client_id = "291866437db7b9cb4c4ab21adb8248c7"
 name = "tasslelife cart"
-application_url = "https://tasslelife-cart.onrender.com"
+application_url = "https://tasslelife-cart-mmcz.onrender.com"
 embedded = true
 
 [build]
@@ -24,9 +24,9 @@ scopes = "read_products,write_products,write_metaobject_definitions,write_metaob
 
 [auth]
 redirect_urls = [
-  "https://tasslelife-cart.onrender.com/auth/callback",
-  "https://tasslelife-cart.onrender.com/auth/shopify/callback",
-  "https://tasslelife-cart.onrender.com/api/auth/callback"
+  "https://tasslelife-cart-mmcz.onrender.com/auth/callback",
+  "https://tasslelife-cart-mmcz.onrender.com/auth/shopify/callback",
+  "https://tasslelife-cart-mmcz.onrender.com/api/auth/callback"
 ]
 
 # Cart drawer settings stored on the shop
