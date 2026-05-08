@@ -123,22 +123,7 @@
     </div>
     {% endif %}
 
-    <!-- Delivery Date -->
-    {% if s.enableDeliveryDate %}
-    <div class="tasslelife-cart-drawer__section">
-      <label class="tasslelife-cart-drawer__section-label" for="tasslelife-cart-drawer-date">
-        <span>📅</span> {{ s.deliveryDateLabel | default: 'Choose delivery date' }}
-      </label>
-      <input
-        type="date"
-        id="tasslelife-cart-drawer-date"
-        class="tasslelife-cart-drawer__date-input"
-        data-min-days="{{ s.deliveryDateMinDays | default: 1 }}"
-        data-max-days="{{ s.deliveryDateMaxDays | default: 30 }}"
-        aria-label="{{ s.deliveryDateLabel | default: 'Choose delivery date' }}"
-      >
-    </div>
-    {% endif %}
+
 
     <!-- Handwritten Note -->
     {% if s.enableOrderNote %}

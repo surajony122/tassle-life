@@ -110,33 +110,31 @@ class TasslelifeCartDrawer {
     // Selectors for cart icon links/buttons — safe ones that are never also ATC buttons
     const safeSelectors = [
       'a[href="/cart"]',
+      'a[href$="/cart"]',       // For multi-language (e.g. /fr/cart)
+      'a[href*="/cart?"]',      // For query params
       '#cart-icon-bubble',
       '.cart-icon-bubble',
       '.header__icon--cart',
       'a[href="/cart/show"]',
       '[data-cart-icon]',
       '.cart__icon',
+      'a.site-header__cart',
+      '.js-drawer-open-cart',
+      '.site-header__cart-toggle',
+      '#CartButton',
+      '.cart-link'
     ].join(',');
 
-    const bindIcons = (root = document) => {
-      root.querySelectorAll(safeSelectors).forEach(el => {
-        if (el._cartDrawerBound) return;
-        el._cartDrawerBound = true;
-        // Capture phase ensures we run before the theme's bubble-phase handler
-        el.addEventListener('click', e => {
-          e.preventDefault();
-          e.stopImmediatePropagation(); // stop theme's handler on same element
-          this.open();
-        }, true);
-      });
-    };
-
-    bindIcons();
-
-    // MutationObserver handles lazy-rendered headers (e.g. theme JS that inserts header after load)
-    const observer = new MutationObserver(() => bindIcons());
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => observer.disconnect(), 8000);
+    // A single global capture-phase listener guarantees we intercept the click BEFORE
+    // the event travels down to the button itself, completely blocking the theme's JS.
+    document.addEventListener('click', (e) => {
+      const cartLink = e.target.closest(safeSelectors);
+      if (cartLink) {
+        e.preventDefault();
+        e.stopPropagation(); // Stops the event from reaching the theme's elements
+        this.open();
+      }
+    }, true);
   }
 
   // ─── Suppress theme cart (Horizon + other themes) ────────────────────────
@@ -575,8 +573,8 @@ class TasslelifeCartDrawer {
     this.compactEl.style.display = 'block';
     const compactApplyBtn = document.querySelector('.tasslelife-cart-drawer__coupons-compact-apply');
     if (this.bestCoupon) {
-      document.getElementById('tasslelife-cart-drawer-best-savings').textContent = `Save ${this.formatMoney(this.bestCoupon.savings)}`;
-      document.getElementById('tasslelife-cart-drawer-best-code').textContent = `with '${this.bestCoupon.code}'`;
+      document.getElementById('tasslelife-cart-drawer-best-savings').innerHTML = `Save ${this.formatMoney(this.bestCoupon.savings)}`;
+      document.getElementById('tasslelife-cart-drawer-best-code').innerHTML = `with '${this.bestCoupon.code}'`;
       const moreCount = available.length + unavailable.length - 1;
       document.getElementById('tasslelife-cart-drawer-more-count').textContent = moreCount;
       
@@ -589,8 +587,8 @@ class TasslelifeCartDrawer {
     } else if (unavailable.length) {
       // Show closest unavailable
       const closest = unavailable[0];
-      document.getElementById('tasslelife-cart-drawer-best-savings').textContent = `Save ${this.formatMoney(closest.savings || closest.value*100)}`;
-      document.getElementById('tasslelife-cart-drawer-best-code').textContent = `with '${closest.code}'`;
+      document.getElementById('tasslelife-cart-drawer-best-savings').innerHTML = `Save ${this.formatMoney(closest.savings || closest.value*100)}`;
+      document.getElementById('tasslelife-cart-drawer-best-code').innerHTML = `with '${closest.code}'`;
       document.getElementById('tasslelife-cart-drawer-more-count').textContent = evaluated.length - 1;
       compactApplyBtn.style.display = 'none';
     } else {
