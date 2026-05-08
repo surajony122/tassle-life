@@ -192,8 +192,8 @@ export default function Index() {
       statusLine: state.availableDiscounts
         ? `Preset codes: ${state.availableDiscounts.split(",").length} configured`
         : "Shoppers can type a code manually.",
-      setupStep: "Add preset codes in Settings → Discount Code (format: CODE:Label). Savings % auto-detected from labels like \"10% Off\".",
-      setupNote: "Enable to show a discount code field inside the cart drawer.",
+      setupStep: "Add preset coupons dynamically in the new Coupons page.",
+      setupNote: "Enable to show a discount code field and smart coupons inside the cart drawer.",
     },
     {
       key: "enableDeliveryTimeline", icon: "🚚",
