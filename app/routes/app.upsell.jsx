@@ -143,7 +143,10 @@ export default function UpsellPage() {
         setHandles(new Set(fetcher.data.saved.handles));
       }
     }
-    if (fetcher.data?.errors?.length) shopify.toast.show("Error saving upsell settings", { isError: true });
+    if (fetcher.data?.errors?.length) {
+      const msg = fetcher.data.errors[0].message || "Error saving upsell settings";
+      shopify.toast.show(msg, { isError: true });
+    }
   }, [fetcher.data, shopify]);
 
   const toggleHandle = (handle) => {
