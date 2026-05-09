@@ -88,7 +88,7 @@ export const action = async ({ request }) => {
   const { data } = await res.json();
   const errors = data?.metafieldsSet?.userErrors || [];
   if (errors.length) return { success: false, errors };
-  return { success: true, saved: { mode, collection, handles } };
+  return { success: true, saved: { mode, collection, handles, showAddToCart } };
 };
 
 // ─── UI helpers ────────────────────────────────────────────────────────────
