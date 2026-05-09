@@ -68,11 +68,16 @@
     <!-- Upsell -->
     {% if s.enableUpsell != false %}
     {% assign upsell_mode = u.mode | default: 'ai' %}
+    {% assign show_atc = true %}
+    {% if u.showAddToCart == false %}
+      {% assign show_atc = false %}
+    {% endif %}
     <div
       id="tasslelife-cart-drawer-upsell"
       class="tasslelife-cart-drawer__upsell"
       style="display:none;"
       data-upsell-mode="{{ upsell_mode }}"
+      data-show-atc="{{ show_atc }}"
       {% if upsell_mode == 'collection' and u.collection != blank %}
       data-upsell-collection="{{ u.collection | escape }}"
       {% endif %}

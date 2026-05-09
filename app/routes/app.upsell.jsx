@@ -40,10 +40,10 @@ export const loader = async ({ request }) => {
     const parsed = raw ? JSON.parse(raw) : null;
     // Handle legacy format where we saved an array of GIDs
     saved = Array.isArray(parsed) || !parsed
-      ? { mode: "ai", collection: "", handles: [] }
-      : { mode: "ai", collection: "", handles: [], ...parsed };
+      ? { mode: "ai", collection: "", handles: [], showAddToCart: true }
+      : { mode: "ai", collection: "", handles: [], showAddToCart: true, ...parsed };
   } catch {
-    saved = { mode: "ai", collection: "", handles: [] };
+    saved = { mode: "ai", collection: "", handles: [], showAddToCart: true };
   }
 
   const { data: pd } = await productsRes.json();
@@ -58,6 +58,7 @@ export const action = async ({ request }) => {
 
   const mode = fd.get("mode") || "ai";
   const collection = fd.get("collection") || "";
+  const showAddToCart = fd.get("showAddToCart") === "true";
   const handles = fd.getAll("handle");
 
   const shopRes = await admin.graphql(`#graphql query { shop { id } }`);
@@ -78,7 +79,7 @@ export const action = async ({ request }) => {
           namespace: NAMESPACE,
           key: KEY,
           type: "json",
-          value: JSON.stringify({ mode, collection, handles }),
+          value: JSON.stringify({ mode, collection, handles, showAddToCart }),
         }],
       },
     }
@@ -118,6 +119,7 @@ export default function UpsellPage() {
 
   const [mode, setMode]             = useState(saved.mode);
   const [collection, setCollection] = useState(saved.collection);
+  const [showAddToCart, setShowAddToCart] = useState(saved.showAddToCart !== false);
   const [handles, setHandles]       = useState(new Set(saved.handles));
 
   const isSaving = fetcher.state !== "idle";
@@ -128,6 +130,7 @@ export default function UpsellPage() {
       if (fetcher.data.saved) {
         setMode(fetcher.data.saved.mode);
         setCollection(fetcher.data.saved.collection);
+        setShowAddToCart(fetcher.data.saved.showAddToCart !== false);
         setHandles(new Set(fetcher.data.saved.handles));
       }
     }
@@ -146,6 +149,7 @@ export default function UpsellPage() {
     const fd = new FormData();
     fd.append("mode", mode);
     fd.append("collection", collection);
+    fd.append("showAddToCart", showAddToCart);
     handles.forEach(h => fd.append("handle", h));
     fetcher.submit(fd, { method: "POST" });
   };
@@ -185,6 +189,19 @@ export default function UpsellPage() {
             </p>
           </div>
         )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+          <input
+            type="checkbox"
+            id="showAddToCart"
+            checked={showAddToCart}
+            onChange={e => setShowAddToCart(e.target.checked)}
+            style={{ width: 16, height: 16 }}
+          />
+          <label htmlFor="showAddToCart" style={{ fontSize: 14, color: "#202223", cursor: "pointer" }}>
+            Show "Add to Cart" button on upsell items
+          </label>
+        </div>
       </SectionCard>
 
       {mode === "manual" && (

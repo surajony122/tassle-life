@@ -1029,6 +1029,7 @@ class TasslelifeCartDrawer {
     if (cart.item_count === 0) { this.upsellSection.style.display = 'none'; return; }
 
     const mode           = this.upsellSection.dataset.upsellMode || 'ai';
+    const showAtc        = this.upsellSection.dataset.showAtc !== 'false';
     const cartProductIds = cart.items.map(i => i.product_id);
 
     if (mode === 'manual') {
@@ -1040,7 +1041,7 @@ class TasslelifeCartDrawer {
       products = products.filter(p => !cartProductIds.includes(p.id));
       if (!products.length) { this.upsellSection.style.display = 'none'; return; }
       this.upsellSection.style.display = 'block';
-      this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLManual(p)).join('');
+      this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLManual(p, showAtc)).join('');
       this.bindUpsellEvents();
       return;
     }
@@ -1054,7 +1055,7 @@ class TasslelifeCartDrawer {
           const products = (data.products || []).filter(p => !cartProductIds.includes(p.id)).slice(0, 4);
           if (!products.length) { this.upsellSection.style.display = 'none'; return; }
           this.upsellSection.style.display = 'block';
-          this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLAi(p)).join('');
+          this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLAi(p, showAtc)).join('');
           this.bindUpsellEvents();
         })
         .catch(() => { this.upsellSection.style.display = 'none'; });
@@ -1069,14 +1070,14 @@ class TasslelifeCartDrawer {
         const products = (data.products || []).filter(p => !cartProductIds.includes(p.id));
         if (!products.length) { this.upsellSection.style.display = 'none'; return; }
         this.upsellSection.style.display = 'block';
-        this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLAi(p)).join('');
+        this.upsellItems.innerHTML = products.map(p => this.upsellItemHTMLAi(p, showAtc)).join('');
         this.bindUpsellEvents();
       })
       .catch(() => { this.upsellSection.style.display = 'none'; });
   }
 
   // For AI / collection mode — product object from Shopify AJAX API (prices already in cents)
-  upsellItemHTMLAi(product) {
+  upsellItemHTMLAi(product, showAtc = true) {
     const variant      = product.variants?.[0];
     if (!variant) return '';
     const price        = variant.price || 0;
@@ -1097,13 +1098,13 @@ class TasslelifeCartDrawer {
         <div class="tasslelife-cart-drawer__upsell-card-body">
           <p class="tasslelife-cart-drawer__upsell-name">${this.escape(product.title)}</p>
           <p class="tasslelife-cart-drawer__upsell-price">${priceHTML}</p>
-          <button class="tasslelife-cart-drawer__upsell-add-btn" data-variant-id="${variant.id}">+ ADD</button>
+          ${showAtc ? `<button class="tasslelife-cart-drawer__upsell-add-btn" data-variant-id="${variant.id}">+ ADD</button>` : ''}
         </div>
       </div>`;
   }
 
   // For manual mode — product object resolved server-side via Liquid (prices are in cents already)
-  upsellItemHTMLManual(product) {
+  upsellItemHTMLManual(product, showAtc = true) {
     if (!product.variant_id) return '';
     const price        = product.price || 0;
     const comparePrice = product.compare_price || 0;
@@ -1123,7 +1124,7 @@ class TasslelifeCartDrawer {
         <div class="tasslelife-cart-drawer__upsell-card-body">
           <p class="tasslelife-cart-drawer__upsell-name">${this.escape(product.title)}</p>
           <p class="tasslelife-cart-drawer__upsell-price">${priceHTML}</p>
-          <button class="tasslelife-cart-drawer__upsell-add-btn" data-variant-id="${product.variant_id}">+ ADD</button>
+          ${showAtc ? `<button class="tasslelife-cart-drawer__upsell-add-btn" data-variant-id="${product.variant_id}">+ ADD</button>` : ''}
         </div>
       </div>`;
   }
