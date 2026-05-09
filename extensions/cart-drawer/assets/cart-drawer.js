@@ -75,7 +75,6 @@ class TasslelifeCartDrawer {
   // ─── Open / Close ─────────────────────────────────────────────────────────
 
   async open() {
-    await this.refresh();
     this.drawer.classList.add('is-open');
     this.overlay.classList.add('is-visible');
     document.body.classList.add('tasslelife-cart-drawer-open');
@@ -85,6 +84,8 @@ class TasslelifeCartDrawer {
     this.suppressThemeCart();
     setTimeout(() => this.suppressThemeCart(), 150);
     setTimeout(() => this.suppressThemeCart(), 400);
+    
+    await this.refresh();
   }
 
   close() {
@@ -130,7 +131,7 @@ class TasslelifeCartDrawer {
 
     // A single global capture-phase listener guarantees we intercept the click BEFORE
     // the event travels down to the button itself, completely blocking the theme's JS.
-    document.addEventListener('click', (e) => {
+    window.addEventListener('click', (e) => {
       const cartLink = e.target.closest(safeSelectors);
       if (cartLink) {
         e.preventDefault();
