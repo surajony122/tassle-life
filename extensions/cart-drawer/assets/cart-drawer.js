@@ -122,7 +122,10 @@ class TasslelifeCartDrawer {
       '.js-drawer-open-cart',
       '.site-header__cart-toggle',
       '#CartButton',
-      '.cart-link'
+      '.cart-link',
+      '[data-testid="cart-drawer-trigger"]',
+      '[data-testid="cart-icon"]',
+      '.header-actions__cart-icon'
     ].join(',');
 
     // A single global capture-phase listener guarantees we intercept the click BEFORE
