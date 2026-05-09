@@ -53,42 +53,51 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const fd = await request.formData();
+  try {
+    const { admin } = await authenticate.admin(request);
+    const fd = await request.formData();
 
-  const mode = fd.get("mode") || "ai";
-  const collection = fd.get("collection") || "";
-  const showAddToCart = fd.get("showAddToCart") === "true";
-  const handles = fd.getAll("handle");
+    const mode = fd.get("mode") || "ai";
+    const collection = fd.get("collection") || "";
+    const showAddToCart = fd.get("showAddToCart") === "true";
+    const handles = fd.getAll("handle");
 
-  const shopRes = await admin.graphql(`#graphql query { shop { id } }`);
-  const { data: shopData } = await shopRes.json();
-
-  const res = await admin.graphql(
-    `#graphql
-    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
-      metafieldsSet(metafields: $metafields) {
-        metafields { id }
-        userErrors { field message }
-      }
-    }`,
-    {
-      variables: {
-        metafields: [{
-          ownerId: shopData.shop.id,
-          namespace: NAMESPACE,
-          key: KEY,
-          type: "json",
-          value: JSON.stringify({ mode, collection, handles, showAddToCart }),
-        }],
-      },
+    const shopRes = await admin.graphql(`#graphql query { shop { id } }`);
+    const shopJson = await shopRes.json();
+    
+    if (!shopJson.data?.shop?.id) {
+      return { success: false, errors: [{ message: "Failed to get shop ID", details: shopJson }] };
     }
-  );
+    const shopData = shopJson.data;
 
-  const { data } = await res.json();
-  const errors = data?.metafieldsSet?.userErrors || [];
-  if (errors.length) return { success: false, errors };
-  return { success: true, saved: { mode, collection, handles, showAddToCart } };
+    const res = await admin.graphql(
+      `#graphql
+      mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+          metafields { id }
+          userErrors { field message }
+        }
+      }`,
+      {
+        variables: {
+          metafields: [{
+            ownerId: shopData.shop.id,
+            namespace: NAMESPACE,
+            key: KEY,
+            type: "json",
+            value: JSON.stringify({ mode, collection, handles, showAddToCart }),
+          }],
+        },
+      }
+    );
+
+    const { data } = await res.json();
+    const errors = data?.metafieldsSet?.userErrors || [];
+    if (errors.length) return { success: false, errors };
+    return { success: true, saved: { mode, collection, handles, showAddToCart } };
+  } catch (error) {
+    return { success: false, errors: [{ message: error.message || "Unknown error" }] };
+  }
 };
 
 // ─── UI helpers ────────────────────────────────────────────────────────────
