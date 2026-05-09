@@ -63,7 +63,13 @@ export const action = async ({ request }) => {
     const handles = fd.getAll("handle");
 
     const shopRes = await admin.graphql(`#graphql query { shop { id } }`);
-    const shopJson = await shopRes.json();
+    const shopText = await shopRes.text();
+    let shopJson;
+    try {
+      shopJson = JSON.parse(shopText);
+    } catch (e) {
+      return { success: false, errors: [{ message: `JSON parse error (shop query): ${e.message}`, details: shopText.substring(0, 100) }] };
+    }
     
     if (!shopJson.data?.shop?.id) {
       return { success: false, errors: [{ message: "Failed to get shop ID", details: shopJson }] };
@@ -91,8 +97,15 @@ export const action = async ({ request }) => {
       }
     );
 
-    const { data } = await res.json();
-    const errors = data?.metafieldsSet?.userErrors || [];
+    const resText = await res.text();
+    let resJson;
+    try {
+      resJson = JSON.parse(resText);
+    } catch (e) {
+      return { success: false, errors: [{ message: `JSON parse error (mutation): ${e.message}`, details: resText.substring(0, 100) }] };
+    }
+
+    const errors = resJson.data?.metafieldsSet?.userErrors || [];
     if (errors.length) return { success: false, errors };
     return { success: true, saved: { mode, collection, handles, showAddToCart } };
   } catch (error) {
