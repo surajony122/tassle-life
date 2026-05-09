@@ -957,8 +957,40 @@ class TasslelifeCartDrawer {
 
     const tiers      = this.progressTiers;
     const total      = cart.total_price;                          // cents
-    const maxThresh  = tiers[tiers.length - 1].threshold * 100;  // cents
-    const fillPct    = Math.min((total / maxThresh) * 100, 100);
+    const n          = tiers.length;
+
+    // Calculate fill percentage based on segments
+    let fillPct = 0;
+    let currentTierIndex = -1;
+    for (let i = 0; i < n; i++) {
+      if (total >= tiers[i].threshold * 100) {
+        currentTierIndex = i;
+      } else {
+        break;
+      }
+    }
+
+    if (currentTierIndex === -1) {
+      // Below the first tier
+      const nextThresh = tiers[0].threshold * 100;
+      const segmentProgress = total / nextThresh;
+      fillPct = (segmentProgress * (100 / n));
+    } else if (currentTierIndex === n - 1) {
+      // Beyond or at the last tier
+      fillPct = 100;
+    } else {
+      // Between currentTierIndex and currentTierIndex + 1
+      const currentThresh = tiers[currentTierIndex].threshold * 100;
+      const nextThresh = tiers[currentTierIndex + 1].threshold * 100;
+      const segmentProgress = (total - currentThresh) / (nextThresh - currentThresh);
+      
+      const startPct = ((currentTierIndex + 1) / n) * 100;
+      const endPct = ((currentTierIndex + 2) / n) * 100;
+      
+      fillPct = startPct + (segmentProgress * (endPct - startPct));
+    }
+    
+    fillPct = Math.min(Math.max(fillPct, 0), 100);
 
     // Next unlocked tier
     const nextTier = tiers.find(t => total < t.threshold * 100);
@@ -967,9 +999,9 @@ class TasslelifeCartDrawer {
       ? `Add ${this.formatMoney((nextTier.threshold * 100) - total)} more for <strong>${nextTier.label}</strong>`
       : `🎉 You've unlocked all rewards!`;
 
-    // Milestone markers — positioned proportionally along the bar
-    const milestonesHTML = tiers.map(tier => {
-      const posPct   = (tier.threshold * 100 / maxThresh) * 100;
+    // Milestone markers — equally divided
+    const milestonesHTML = tiers.map((tier, index) => {
+      const posPct   = ((index + 1) / n) * 100;
       const unlocked = total >= tier.threshold * 100;
       return `
         <div class="tasslelife-cart-drawer__milestone ${unlocked ? 'is-unlocked' : ''}" style="left:${posPct}%">
