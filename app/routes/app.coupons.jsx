@@ -10,60 +10,72 @@ const KEY = "settings";
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   
-  // Fetch settings and active discounts in parallel
-  const [settingsRes, discountsRes] = await Promise.all([
-    admin.graphql(`
-      #graphql
-      query getSettings {
-        shop {
-          metafield(namespace: "${NAMESPACE}", key: "${KEY}") { value }
+  try {
+    const [settingsRes, discountsRes] = await Promise.all([
+      admin.graphql(`
+        #graphql
+        query getSettings {
+          shop {
+            metafield(namespace: "${NAMESPACE}", key: "${KEY}") { value }
+          }
         }
-      }
-    `),
-    admin.graphql(`
-      #graphql
-      query getActiveDiscounts {
-        codeDiscountNodes(first: 20, query: "status:active") {
-          edges {
-            node {
-              id
-              codeDiscount {
-                ... on DiscountCodeBasic {
-                  title
-                  codes(first: 1) { nodes { code } }
-                }
-                ... on DiscountCodeBxgy {
-                  title
-                  codes(first: 1) { nodes { code } }
-                }
-                ... on DiscountCodeFreeShipping {
-                  title
-                  codes(first: 1) { nodes { code } }
+      `),
+      admin.graphql(`
+        #graphql
+        query getActiveDiscounts {
+          codeDiscountNodes(first: 20, query: "status:active") {
+            edges {
+              node {
+                id
+                codeDiscount {
+                  ... on DiscountCodeBasic {
+                    title
+                    codes(first: 1) { nodes { code } }
+                  }
+                  ... on DiscountCodeBxgy {
+                    title
+                    codes(first: 1) { nodes { code } }
+                  }
+                  ... on DiscountCodeFreeShipping {
+                    title
+                    codes(first: 1) { nodes { code } }
+                  }
                 }
               }
             }
           }
         }
-      }
-    `)
-  ]);
+      `)
+    ]);
 
-  const { data: settingsData } = await settingsRes.json();
-  const { data: discountsData } = await discountsRes.json();
+    const settingsJson = await settingsRes.json();
+    const discountsJson = await discountsRes.json();
 
-  const raw = settingsData?.shop?.metafield?.value;
-  const settings = raw ? JSON.parse(raw) : {};
+    const settingsData = settingsJson.data;
+    const discountsData = discountsJson.data;
 
-  const activeDiscounts = discountsData?.codeDiscountNodes?.edges?.map(edge => {
-    const cd = edge.node.codeDiscount;
-    const code = cd.codes?.nodes[0]?.code || cd.title;
-    return { id: edge.node.id, title: cd.title, code };
-  }) || [];
-  
-  return { 
-    coupons: settings.coupons || [],
-    activeDiscounts
-  };
+    const raw = settingsData?.shop?.metafield?.value;
+    const settings = raw ? JSON.parse(raw) : {};
+
+    const activeDiscounts = discountsData?.codeDiscountNodes?.edges?.map(edge => {
+      const cd = edge.node.codeDiscount;
+      const code = cd.codes?.nodes[0]?.code || cd.title;
+      return { id: edge.node.id, title: cd.title, code };
+    }) || [];
+
+    return { 
+      coupons: settings.coupons || [],
+      activeDiscounts,
+      scopesError: discountsJson.errors ? true : false
+    };
+  } catch (error) {
+    console.error("Loader error:", error);
+    return { 
+      coupons: [],
+      activeDiscounts: [],
+      error: "Failed to load data. Please check app scopes."
+    };
+  }
 };
 
 export const action = async ({ request }) => {
@@ -144,7 +156,7 @@ function SelectField({ label, children, ...props }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CouponsPage() {
-  const { coupons: initialCoupons, activeDiscounts } = useLoaderData();
+  const { coupons: initialCoupons, activeDiscounts, scopesError, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
 
@@ -203,6 +215,17 @@ export default function CouponsPage() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 20px" }}>
       <ui-title-bar title="Manage Coupons" />
+
+      {error && (
+        <div style={{ background: "#fee2e2", color: "#b91c1c", padding: "12px", borderRadius: 8, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+      {scopesError && (
+        <div style={{ background: "#fef08a", color: "#854d0e", padding: "12px", borderRadius: 8, marginBottom: 16 }}>
+          Warning: Failed to fetch active discounts. Please ensure the app has the `read_discounts` scope and is reinstalled.
+        </div>
+      )}
 
       {/* Active Shopify Discounts Section */}
       <div style={{ background: "#fff", border: "1px solid #e1e3e5", borderRadius: 8, padding: "20px 24px", marginBottom: 16 }}>
