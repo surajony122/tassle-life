@@ -567,8 +567,8 @@ class TasslelifeCartDrawer {
     });
     
     // Split
-    const available = evaluated.filter(c => c.isAvailable).sort((a,b) => b.savings - a.savings);
-    const unavailable = evaluated.filter(c => !c.isAvailable).sort((a,b) => a.shortfall - b.shortfall);
+    const available = evaluated.filter(c => c.isAvailable);
+    const unavailable = evaluated.filter(c => !c.isAvailable);
     
     this.bestCoupon = available[0] || null;
     
@@ -947,7 +947,32 @@ class TasslelifeCartDrawer {
   }
 
   renderSubtotal(cart) {
-    if (this.subtotalEl) this.subtotalEl.innerHTML = this.formatMoney(cart.total_price);
+    if (!this.subtotalEl) return;
+    
+    const code = sessionStorage.getItem('tasslelife_cart_drawer_discount');
+    let totalPrice = cart.total_price;
+    let savings = 0;
+    
+    if (code && this.couponsData) {
+      const coupon = this.couponsData.find(c => c.code === code);
+      if (coupon) {
+        if (coupon.type === 'percentage') {
+          savings = Math.round(cart.total_price * (coupon.value / 100));
+        } else if (coupon.type === 'fixed') {
+          savings = coupon.value * 100;
+        }
+        totalPrice = Math.max(0, cart.total_price - savings);
+      }
+    }
+    
+    if (savings > 0) {
+      this.subtotalEl.innerHTML = `
+        <s class="tasslelife-cart-drawer__subtotal-original" style="color: #6d7175; font-size: 0.9em; margin-right: 8px;">${this.formatMoney(cart.total_price)}</s>
+        <span class="tasslelife-cart-drawer__subtotal-discounted">${this.formatMoney(totalPrice)}</span>
+      `;
+    } else {
+      this.subtotalEl.innerHTML = this.formatMoney(cart.total_price);
+    }
   }
 
   // ─── Multi-tier Progress Bar ──────────────────────────────────────────────

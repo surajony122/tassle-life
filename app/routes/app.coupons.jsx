@@ -9,24 +9,60 @@ const KEY = "settings";
 
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
-  const res = await admin.graphql(`
-    #graphql
-    query getSettings {
-      shop {
-        metafield(namespace: "${NAMESPACE}", key: "${KEY}") { value }
+  
+  // Fetch settings and active discounts in parallel
+  const [settingsRes, discountsRes] = await Promise.all([
+    admin.graphql(`
+      #graphql
+      query getSettings {
+        shop {
+          metafield(namespace: "${NAMESPACE}", key: "${KEY}") { value }
+        }
       }
-    }
-  `);
-  const { data } = await res.json();
-  const raw = data?.shop?.metafield?.value;
+    `),
+    admin.graphql(`
+      #graphql
+      query getActiveDiscounts {
+        codeDiscountNodes(first: 20, query: "status:active") {
+          edges {
+            node {
+              id
+              codeDiscount {
+                ... on DiscountCodeBasic {
+                  title
+                  codes(first: 1) { nodes { code } }
+                }
+                ... on DiscountCodeBxgy {
+                  title
+                  codes(first: 1) { nodes { code } }
+                }
+                ... on DiscountCodeFreeShipping {
+                  title
+                  codes(first: 1) { nodes { code } }
+                }
+              }
+            }
+          }
+        }
+      }
+    `)
+  ]);
+
+  const { data: settingsData } = await settingsRes.json();
+  const { data: discountsData } = await discountsRes.json();
+
+  const raw = settingsData?.shop?.metafield?.value;
   const settings = raw ? JSON.parse(raw) : {};
+
+  const activeDiscounts = discountsData?.codeDiscountNodes?.edges?.map(edge => {
+    const cd = edge.node.codeDiscount;
+    const code = cd.codes?.nodes[0]?.code || cd.title;
+    return { id: edge.node.id, title: cd.title, code };
+  }) || [];
   
   return { 
-    coupons: settings.coupons || [
-      { code: "FAB10", type: "percentage", value: 10, minThreshold: 1499 },
-      { code: "FAB5",  type: "percentage", value: 5,  minThreshold: 999 },
-      { code: "FAB15", type: "percentage", value: 15, minThreshold: 3999 }
-    ]
+    coupons: settings.coupons || [],
+    activeDiscounts
   };
 };
 
@@ -108,7 +144,7 @@ function SelectField({ label, children, ...props }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CouponsPage() {
-  const { coupons: initialCoupons } = useLoaderData();
+  const { coupons: initialCoupons, activeDiscounts } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
 
@@ -139,20 +175,27 @@ export default function CouponsPage() {
     setCoupons(coupons.filter((_, i) => i !== index));
   };
 
-  const addCoupon = () => {
-    setCoupons([...coupons, { code: "", type: "percentage", value: 10, minThreshold: 1000 }]);
+  const addCoupon = (code = "") => {
+    setCoupons([...coupons, { code, type: "percentage", value: 10, minThreshold: 1000 }]);
+  };
+
+  const moveCoupon = (index, direction) => {
+    const newCoupons = [...coupons];
+    const targetIndex = index + direction;
+    if (targetIndex >= 0 && targetIndex < newCoupons.length) {
+      const temp = newCoupons[index];
+      newCoupons[index] = newCoupons[targetIndex];
+      newCoupons[targetIndex] = temp;
+      setCoupons(newCoupons);
+    }
   };
 
   const handleSave = () => {
     const fd = new FormData();
-    // Filter out empty codes and auto-sort by threshold descending (highest first)
-    const cleanCoupons = coupons
-      .filter(c => c.code.trim() !== "")
-      .sort((a, b) => Number(b.minThreshold) - Number(a.minThreshold));
+    // Filter out empty codes but preserve user order
+    const cleanCoupons = coupons.filter(c => c.code.trim() !== "");
       
-    // Update local state to reflect sorted order immediately
     setCoupons(cleanCoupons);
-    
     fd.append("coupons", JSON.stringify(cleanCoupons));
     fetcher.submit(fd, { method: "POST" });
   };
@@ -161,14 +204,45 @@ export default function CouponsPage() {
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 20px" }}>
       <ui-title-bar title="Manage Coupons" />
 
+      {/* Active Shopify Discounts Section */}
+      <div style={{ background: "#fff", border: "1px solid #e1e3e5", borderRadius: 8, padding: "20px 24px", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px", color: "#202223" }}>
+          Active Shopify Discounts
+        </h2>
+        <p style={{ fontSize: 13, color: "#6d7175", marginBottom: 16 }}>
+          Click an active discount to add it to the Cart Drawer list.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {activeDiscounts.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#6d7175" }}>No active discounts found in Shopify.</p>
+          ) : (
+            activeDiscounts.map(ad => (
+              <button
+                key={ad.id}
+                onClick={() => addCoupon(ad.code)}
+                style={{
+                  background: "#f1f1f1", border: "1px solid #ddd", borderRadius: 16,
+                  padding: "6px 12px", fontSize: 13, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 6
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>{ad.code}</span>
+                <span style={{ color: "#666", fontSize: 12 }}>({ad.title})</span>
+                <span style={{ color: "#008060" }}>+ Add</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Selected Coupons Section */}
       <div style={{ background: "#fff", border: "1px solid #e1e3e5", borderRadius: 8, padding: "20px 24px", marginBottom: 16 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px", color: "#202223" }}>
-          Dynamic Cart Coupons
+          Selected Coupons for Cart Drawer
         </h2>
         <p style={{ fontSize: 13, color: "#6d7175", marginBottom: 20 }}>
-          These coupons will automatically appear in the Cart Drawer based on the user's cart subtotal. 
+          These coupons will appear in the Cart Drawer. The order here determines which one shows first.
           If a user doesn't meet the threshold, they will see a "Add $X more to avail this offer" message.
-          <br/><strong>Note:</strong> Coupons are automatically sorted by highest threshold first when saving.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -177,6 +251,22 @@ export default function CouponsPage() {
               display: "flex", gap: 12, alignItems: "flex-end", 
               padding: "16px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8 
             }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <button 
+                  onClick={() => moveCoupon(idx, -1)} 
+                  disabled={idx === 0}
+                  style={{ cursor: idx === 0 ? "not-allowed" : "pointer", border: "1px solid #ccc", background: "#fff", borderRadius: 4, width: 24, height: 24, display: "flex", alignItems: "center", justifyCenter: "center" }}
+                >
+                  ↑
+                </button>
+                <button 
+                  onClick={() => moveCoupon(idx, 1)} 
+                  disabled={idx === coupons.length - 1}
+                  style={{ cursor: idx === coupons.length - 1 ? "not-allowed" : "pointer", border: "1px solid #ccc", background: "#fff", borderRadius: 4, width: 24, height: 24, display: "flex", alignItems: "center", justifyCenter: "center" }}
+                >
+                  ↓
+                </button>
+              </div>
               <TextField 
                 label="Coupon Code" 
                 value={c.code} 
@@ -219,7 +309,7 @@ export default function CouponsPage() {
         </div>
 
         <button 
-          onClick={addCoupon}
+          onClick={() => addCoupon()}
           style={{ 
             marginTop: 16, background: "#fff", color: "#202223", border: "1px solid #c9cccf", 
             borderRadius: 4, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" 
