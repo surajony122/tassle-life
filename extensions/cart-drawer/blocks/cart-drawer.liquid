@@ -186,6 +186,7 @@
     {% endif %}
 
     <!-- Per-product delivery dates map (built from collection metafields std_min / std_max) -->
+    {% if s.enableItemDeliveryDate %}
     <script id="tasslelife-delivery-dates-map" type="application/json">
     {
       {%- assign _dd_sep = "" -%}
@@ -229,6 +230,7 @@
       {%- endif -%}
     }
     </script>
+    {% endif %}
 
     <!-- Delivery Timeline -->
     {% if s.enableDeliveryTimeline != false %}

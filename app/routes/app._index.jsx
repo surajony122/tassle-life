@@ -10,6 +10,7 @@ const KEY = "settings";
 const VALID_TOGGLES = [
   "enableProgressBar", "enableUpsell", "enableGiftWrap",
   "enableDeliveryDate", "enableOrderNote", "enableDiscount", "enableDeliveryTimeline",
+  "enableItemDeliveryDate",
 ];
 
 // ─── Server ───────────────────────────────────────────────────────────────────
@@ -29,7 +30,8 @@ export const loader = async ({ request }) => {
     enableDeliveryDate:   s.enableDeliveryDate    === true,
     enableOrderNote:      s.enableOrderNote       === true,
     enableDiscount:       s.enableDiscount        !== false,
-    enableDeliveryTimeline: s.enableDeliveryTimeline !== false,
+    enableDeliveryTimeline:  s.enableDeliveryTimeline  !== false,
+    enableItemDeliveryDate:  s.enableItemDeliveryDate  === true,
     tier1Threshold:  s.tier1Threshold  ?? 50,
     tier1Label:      s.tier1Label      ?? "Free Shipping",
     giftWrapVariantId: s.giftWrapVariantId ?? "",
@@ -212,6 +214,13 @@ export default function Index() {
       setupStep: state.giftWrapVariantId
         ? "Gift wrap option is live in the drawer."
         : "Go to Settings → Gift Wrap and enter your gift wrap variant ID.",
+    },
+    {
+      key: "enableItemDeliveryDate", icon: "📦",
+      label: "Per-Product Delivery Dates",
+      statusLine: "Shows estimated delivery dates under each cart item based on its collection.",
+      setupStep: "Set std_min and std_max integer metafields on your Shopify collections. Dates are picked automatically — earliest collection wins.",
+      setupNote: "Enable to show 'Delivery between: X and Y' under each product in the cart drawer.",
     },
     {
       key: "enableDeliveryDate", icon: "📅",
