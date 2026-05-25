@@ -83,6 +83,7 @@ body.tasslelife-cart-drawer-open { overflow: hidden; }
 .tasslelife-cart-drawer__item-price { font-size: 13px; font-weight: 700; color: #111; }
 .tasslelife-cart-drawer__item-compare { font-size: 11px; color: #aaa; display: block; text-decoration: line-through; }
 .tasslelife-cart-drawer__item-variant { font-size: 11px; color: #888; margin: 0 0 4px; }
+.tasslelife-cart-drawer__item-delivery { font-size: 11px; color: #888; margin: 0 0 5px; line-height: 1.4; }
 .tasslelife-cart-drawer__item-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
 .tasslelife-cart-drawer__item-remove { background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #888; transition: all 0.2s; padding: 0; }
 .tasslelife-cart-drawer__item-remove svg { width: 14px; height: 14px; }

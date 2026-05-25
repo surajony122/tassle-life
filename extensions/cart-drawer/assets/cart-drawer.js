@@ -40,6 +40,13 @@ class TasslelifeCartDrawer {
     // Read progress bar tiers from data attributes on #tasslelife-cart-drawer-progress
     this.progressTiers = this.readProgressTiers();
 
+    // Delivery dates map: product_id (string) → { stdMin, stdMax } from collection metafields
+    this._deliveryDatesMap = {};
+    try {
+      const mapEl = document.getElementById('tasslelife-delivery-dates-map');
+      if (mapEl) this._deliveryDatesMap = JSON.parse(mapEl.textContent);
+    } catch {}
+
     this.init();
   }
 
@@ -896,6 +903,7 @@ class TasslelifeCartDrawer {
             <div class="tasslelife-cart-drawer__item-prices">${comparePrice}<span class="tasslelife-cart-drawer__item-price">${linePrice}</span></div>
           </div>
           ${variant}
+          ${this.getItemDeliveryHtml(item.product_id)}
           <div class="tasslelife-cart-drawer__item-bottom">
             <button class="tasslelife-cart-drawer__item-remove" data-key="${item.key}" aria-label="Remove ${this.escape(item.product_title)}">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1177,6 +1185,19 @@ class TasslelifeCartDrawer {
   setItemLoading(key, loading) {
     const item = this.itemsContainer?.querySelector(`[data-key="${key}"]`);
     if (item) item.classList.toggle('is-loading', loading);
+  }
+
+  // ─── Per-item delivery date ───────────────────────────────────────────────
+
+  getItemDeliveryHtml(productId) {
+    const entry = this._deliveryDatesMap?.[String(productId)];
+    if (!entry?.stdMin) return '';
+    const today  = new Date();
+    const addDays = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return d; };
+    const fmt = d => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const minDate = fmt(addDays(entry.stdMin));
+    const maxDate = fmt(addDays(entry.stdMax || entry.stdMin));
+    return `<p class="tasslelife-cart-drawer__item-delivery">Delivery between: ${minDate} and ${maxDate}.</p>`;
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

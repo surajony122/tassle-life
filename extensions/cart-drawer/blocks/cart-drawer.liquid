@@ -185,6 +185,51 @@
     </script>
     {% endif %}
 
+    <!-- Per-product delivery dates map (built from collection metafields std_min / std_max) -->
+    <script id="tasslelife-delivery-dates-map" type="application/json">
+    {
+      {%- assign _dd_sep = "" -%}
+      {%- comment -%}--- Cart items already in cart at page load ---{%- endcomment -%}
+      {%- for item in cart.items -%}
+        {%- assign _dd_min = 9999 -%}
+        {%- assign _dd_max = 9999 -%}
+        {%- assign _dd_found = false -%}
+        {%- for col in item.product.collections -%}
+          {%- assign _col_min = col.metafields.custom.std_min.value | plus: 0 -%}
+          {%- assign _col_max = col.metafields.custom.std_max.value | plus: 0 -%}
+          {%- if _col_min > 0 and _col_min < _dd_min -%}
+            {%- assign _dd_min = _col_min -%}
+            {%- assign _dd_max = _col_max -%}
+            {%- assign _dd_found = true -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- if _dd_found -%}
+          {{ _dd_sep }}"{{ item.product_id }}": { "stdMin": {{ _dd_min }}, "stdMax": {{ _dd_max }} }
+          {%- assign _dd_sep = "," -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- comment -%}--- Current product page (so ATC → open drawer shows dates immediately) ---{%- endcomment -%}
+      {%- if product.id -%}
+        {%- assign _dd_min = 9999 -%}
+        {%- assign _dd_max = 9999 -%}
+        {%- assign _dd_found = false -%}
+        {%- for col in product.collections -%}
+          {%- assign _col_min = col.metafields.custom.std_min.value | plus: 0 -%}
+          {%- assign _col_max = col.metafields.custom.std_max.value | plus: 0 -%}
+          {%- if _col_min > 0 and _col_min < _dd_min -%}
+            {%- assign _dd_min = _col_min -%}
+            {%- assign _dd_max = _col_max -%}
+            {%- assign _dd_found = true -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- if _dd_found -%}
+          {{ _dd_sep }}"{{ product.id }}": { "stdMin": {{ _dd_min }}, "stdMax": {{ _dd_max }} }
+          {%- assign _dd_sep = "," -%}
+        {%- endif -%}
+      {%- endif -%}
+    }
+    </script>
+
     <!-- Delivery Timeline -->
     {% if s.enableDeliveryTimeline != false %}
 
